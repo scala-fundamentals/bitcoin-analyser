@@ -63,19 +63,19 @@ object MarketDataProducer {
   }
 
 
-  def tickerStream(createSource: => Source)(implicit spark: SparkSession): Dataset[Ticker] = {
+  def tickerStream(createSource: Long => Source)(implicit spark: SparkSession): Dataset[Ticker] = {
     import spark.implicits._
     val schema = Seq.empty[TickerJson].toDS().schema
     spark.readStream.format("rate")
       .load()
-      .map(_ => createSource.mkString)
+      .map(row => createSource(row.getAs[Long]("value")).mkString)
       .select(from_json($"value".cast("string"), schema, Map("mode" -> "FAILFAST")).alias("v"))
       .select(
         $"v.timestamp".cast(LongType).cast(TimestampType).as("timestamp"),
         $"v.high".cast(DoubleType),
         $"v.last".cast(DoubleType),
         $"v.bid".cast(DoubleType))
-      .withWatermark("timestamp", "1 second")
+      .withWatermark("timestamp", "3 second")
       .distinct()
       .as[Ticker]
   }

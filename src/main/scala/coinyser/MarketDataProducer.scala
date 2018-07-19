@@ -8,9 +8,14 @@ import scala.collection.JavaConversions._
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.streaming.StreamingQuery
 import org.apache.spark.sql.types.{DoubleType, LongType, TimestampType}
 
 import scala.io.Source
+
+case class KafkaConfig(topic: String,
+                       bootstrapServers: String,
+                       checkpointLocation: String)
 
 object MarketDataProducer {
 
@@ -62,8 +67,20 @@ object MarketDataProducer {
     //      .start()
   }
 
+  def kafkaWriteStream(tickerStream: Dataset[Ticker])
+                      (implicit kafkaConfig: KafkaConfig, spark: SparkSession): StreamingQuery = {
+    tickerStream
+      .toJSON
+      .writeStream
+      .format("kafka")
+      .option("kafka.bootstrap.servers", kafkaConfig.bootstrapServers)
+      .option("topic", kafkaConfig.topic)
+      .option("checkpointLocation", kafkaConfig.checkpointLocation)
+      .start()
+  }
 
-  def tickerStream(createSource: Long => Source)(implicit spark: SparkSession): Dataset[Ticker] = {
+
+  def tickerReadStream(createSource: Long => Source)(implicit spark: SparkSession): Dataset[Ticker] = {
     import spark.implicits._
     val schema = Seq.empty[TickerJson].toDS().schema
     spark.readStream.format("rate")
@@ -76,7 +93,7 @@ object MarketDataProducer {
         $"v.last".cast(DoubleType),
         $"v.bid".cast(DoubleType))
       .withWatermark("timestamp", "3 second")
-      .distinct()
+      .distinct() // we need to use watermark to use distinct, otherwise it will keep everything in memory
       .as[Ticker]
   }
 

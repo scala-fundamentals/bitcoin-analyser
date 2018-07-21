@@ -40,18 +40,28 @@ class MarketDataProducerSpec extends WordSpec with Matchers with BeforeAndAfterA
 
   import spark.implicits._
 
+  val ticker1 = Ticker(
+    last = 6737.45,
+    timestamp = new Timestamp(1531056456000L),
+    bid = 6737.45,
+    ask = 6740.00,
+    vwap = 6692.42,
+    volume = 4821.03915289)
+
+  val ticker2 = Ticker(
+    last = 6737.59,
+    timestamp = new Timestamp(1531056476000L),
+    bid = 6737.65,
+    ask = 6739.99,
+    vwap = 6692.51,
+    volume = 4818.42662236
+  )
 
   "MarketDataProducer.tickerReadStream" should {
     "create a stream of Ticker data from a constant Source with unique values" in {
       val stream = MarketDataProducer.tickerReadStream(createConstantSource)
       val data = processReadStream(stream, 4)
-      val ticker = Ticker(
-        high = 6821.00,
-        last = 6737.59,
-        timestamp = new Timestamp(1531056476000L),
-        bid = 6737.65
-      )
-      data should ===(Seq(ticker))
+      data should ===(Seq(ticker1))
     }
 
     "keep tickers if they arrive out of order within the watermark period" in {
@@ -65,22 +75,6 @@ class MarketDataProducerSpec extends WordSpec with Matchers with BeforeAndAfterA
 
   "MarketDataProducer.kafkaWriteStream" should {
     "write a stream of Ticker to Kafka" in {
-      val ticker1 = Ticker(
-        high = 6821.00,
-        last = 6737.45,
-        timestamp = new Timestamp(1531056456000L),
-        bid = 6737.45)
-      /*        vwap = 6692.42,
-              volume = 4821.03915289,
-              low = 6510.00,
-              ask = 6740.00,
-              open = 6755.46)       */
-      val ticker2 = Ticker(
-        high = 6821.00,
-        last = 6737.59,
-        timestamp = new Timestamp(1531056476000L),
-        bid = 6737.65
-      )
       implicit val sqlc: SQLContext = spark.sqlContext
       val tickerStream = MemoryStream[Ticker]
       tickerStream.addData(ticker1, ticker2)
@@ -96,9 +90,8 @@ class MarketDataProducerSpec extends WordSpec with Matchers with BeforeAndAfterA
       val streamingQuery = MarketDataProducer.kafkaWriteStream(tickerStream.toDS())
       // Order is not guaranteed: each mini-batch is processed in parallel
       processReadStream(kafkaStream, 2).toSet should ===(Set(
-        """{"high":6821.0,"last":6737.45,"timestamp":"2018-07-08T15:27:36.000+02:00","bid":6737.45}""",
-        """{"high":6821.0,"last":6737.59,"timestamp":"2018-07-08T15:27:56.000+02:00","bid":6737.65}"""
-      ))
+        """{"timestamp":"2018-07-08T15:27:56.000+02:00","last":6737.59,"bid":6737.65,"ask":6739.99,"vwap":6692.51,"volume":4818.42662236}""",
+        """{"timestamp":"2018-07-08T15:27:36.000+02:00","last":6737.45,"bid":6737.45,"ask":6740.0,"vwap":6692.42,"volume":4821.03915289}"""))
 
       streamingQuery.stop()
     }
@@ -130,7 +123,7 @@ object MarketDataProducerSpec {
   // In companion object to avoid TaskNotSerializable
 
   def createConstantSource(msgCount: Long): Source =
-    Source.fromURL(getClass.getClassLoader.getResource("ticker_btcusd_20180708_1531056459.json"))
+    Source.fromURL(getClass.getClassLoader.getResource("ticker_btcusd_20180708_1531056456.json"))
 
 
   def createOutOfOrderSource(msgCount: Long): Source =

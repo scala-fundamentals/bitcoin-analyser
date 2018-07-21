@@ -20,15 +20,12 @@ case class TickerJson(high: String,
                       ask: String,
                       open: String)
 
-case class Ticker(high: Double,
+case class Ticker(timestamp: Timestamp,
                   last: Double,
-                  timestamp: Timestamp,
-                  bid: Double)/*,
-                  vwap: String,
-                  volume: String,
-                  low: String,
-                  ask: String,
-                  open: String)*/
+                  bid: Double,
+                  ask: Double,
+                  vwap: Double,
+                  volume: Double)
 
 
 object BatchConsumer {

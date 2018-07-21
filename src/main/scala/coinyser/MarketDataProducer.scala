@@ -58,13 +58,6 @@ object MarketDataProducer {
     in.writeStream.format("console").start()
 
 
-    //    in
-    //      .writeStream
-    //      .format("kafka")
-    //      .option("kafka.bootstrap.servers", "localhost:9092")
-    //      .option("topic", "ticker_btcusd")
-    //      .option("checkpointLocation", "/tmp/coinyser/checkpoint")
-    //      .start()
   }
 
   def kafkaWriteStream(tickerStream: Dataset[Ticker])
@@ -89,9 +82,11 @@ object MarketDataProducer {
       .select(from_json($"value".cast("string"), schema, Map("mode" -> "FAILFAST")).alias("v"))
       .select(
         $"v.timestamp".cast(LongType).cast(TimestampType).as("timestamp"),
-        $"v.high".cast(DoubleType),
         $"v.last".cast(DoubleType),
-        $"v.bid".cast(DoubleType))
+        $"v.bid".cast(DoubleType),
+        $"v.ask".cast(DoubleType),
+        $"v.vwap".cast(DoubleType),
+        $"v.volume".cast(DoubleType))
       .withWatermark("timestamp", "3 second")
       .distinct() // we need to use watermark to use distinct, otherwise it will keep everything in memory
       .as[Ticker]

@@ -12,8 +12,13 @@ bin/kafka-server-start.sh config/server.properties &
 bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic ticker_btcusd --from-beginning
  */
 object MarketDataProducerApp extends App {
-//  MarketDataProducer.sendFile(getClass.getClassLoader.getResource("ticker_btcusd_20180708_1531056455.json"))
-//  MarketDataProducer.sendFile(getClass.getClassLoader.getResource("ticker_btcusd_20180708_1531056459.json"))
+  // In prod, should be a distributed filesystem
+  val checkpointDir = "/tmp/coinyser/MarketDataProducerApp"
+  implicit val kafkaConfig: KafkaConfig = KafkaConfig(
+    topic = "ticker_btcusd",
+    bootstrapServers = "localhost:9092",
+    checkpointLocation = checkpointDir)
+
 
   implicit val spark: SparkSession = SparkSession
     .builder

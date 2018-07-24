@@ -9,21 +9,24 @@ import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.StreamingQuery
-import org.apache.spark.sql.types.{DoubleType, LongType, TimestampType}
+import org.apache.spark.sql.types._
 
 import scala.io.Source
 
+case class KafkaConfig(topic: String,
+                       bootstrapServers: String,
+                       checkpointLocation: String)
 
-object MarketDataProducer {
+object TransactionDataProducer {
 
 
   def start(url: URL)(implicit kafkaConfig: KafkaConfig, spark: SparkSession) = {
-    val tickerStream = tickerReadStream(_ => Source.fromURL(url))
+    val tickerStream = transactionReadStream(_ => Source.fromURL(url))
     kafkaWriteStream(tickerStream)
   }
 
-  def kafkaWriteStream(tickerStream: Dataset[Ticker])
-                      (implicit kafkaConfig: KafkaConfig, spark: SparkSession): StreamingQuery = {
+  def kafkaWriteStream[A](tickerStream: Dataset[A])
+                         (implicit kafkaConfig: KafkaConfig, spark: SparkSession): StreamingQuery = {
     tickerStream
       .toJSON
       .writeStream
@@ -35,23 +38,23 @@ object MarketDataProducer {
   }
 
 
-  def tickerReadStream(createSource: Long => Source)(implicit spark: SparkSession): Dataset[Ticker] = {
+  def transactionReadStream(createSource: Long => Source)(implicit spark: SparkSession): Dataset[Transaction] = {
     import spark.implicits._
-    val schema = Seq.empty[TickerJson].toDS().schema
+    val txSchema = Seq.empty[BitstampTransaction].toDS().schema
+    val schema = ArrayType(txSchema)
     spark.readStream.format("rate")
       .load()
       .map(row => createSource(row.getAs[Long]("value")).mkString)
-      .select(from_json($"value".cast("string"), schema, Map("mode" -> "FAILFAST")).alias("v"))
+      .select(explode(from_json($"value".cast(StringType), schema)).alias("v"))
       .select(
-        $"v.timestamp".cast(LongType).cast(TimestampType).as("timestamp"),
-        $"v.last".cast(DoubleType),
-        $"v.bid".cast(DoubleType),
-        $"v.ask".cast(DoubleType),
-        $"v.vwap".cast(DoubleType),
-        $"v.volume".cast(DoubleType))
-      .withWatermark("timestamp", "3 second")
+        $"v.date".cast(LongType).cast(TimestampType).as("date"),
+        $"v.tid".cast(IntegerType),
+        $"v.price".cast(DoubleType),
+        $"v.type".cast(BooleanType).as("sell"),
+        $"v.amount".cast(DoubleType))
+      .withWatermark("date", "1 second")
       .distinct() // we need to use watermark to use distinct, otherwise it will keep everything in memory
-      .as[Ticker]
+      .as[Transaction]
   }
 
 

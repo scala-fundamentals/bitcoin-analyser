@@ -10,22 +10,9 @@ import org.apache.spark.sql.streaming.StreamingQuery
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.streaming.StreamingContext
 
-case class TickerJson(high: String,
-                      last: String,
-                      timestamp: String,
-                      bid: String,
-                      vwap: String,
-                      volume: String,
-                      low: String,
-                      ask: String,
-                      open: String)
 
-case class Ticker(timestamp: Timestamp,
-                  last: Double,
-                  bid: Double,
-                  ask: Double,
-                  vwap: Double,
-                  volume: Double)
+
+
 
 
 object BatchConsumer {

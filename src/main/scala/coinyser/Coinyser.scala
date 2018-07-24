@@ -1,6 +1,0 @@
-package coinyser
-
-object Coinyser {
-
-
-}

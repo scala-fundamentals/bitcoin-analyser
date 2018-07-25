@@ -23,7 +23,19 @@ object TransactionDataProducer {
   def start(url: URL)(implicit kafkaConfig: KafkaConfig, spark: SparkSession) = {
     val tickerStream = transactionReadStream(_ => Source.fromURL(url))
     kafkaWriteStream(tickerStream)
+    //    consoleWriteStream(tickerStream)
   }
+
+  def consoleWriteStream[A](tickerStream: Dataset[A])
+                           (implicit spark: SparkSession): StreamingQuery = {
+    tickerStream
+      .toJSON
+      .writeStream
+      .format("console")
+      .option("truncate", "false")
+      .start()
+  }
+
 
   def kafkaWriteStream[A](tickerStream: Dataset[A])
                          (implicit kafkaConfig: KafkaConfig, spark: SparkSession): StreamingQuery = {
@@ -42,8 +54,10 @@ object TransactionDataProducer {
     import spark.implicits._
     val txSchema = Seq.empty[BitstampTransaction].toDS().schema
     val schema = ArrayType(txSchema)
-    spark.readStream.format("rate")
+    spark.readStream
+      .format("rate")
       .load()
+      .filter(pmod($"value", lit(5)) === 0)
       .map(row => createSource(row.getAs[Long]("value")).mkString)
       .select(explode(from_json($"value".cast(StringType), schema)).alias("v"))
       .select(
@@ -52,7 +66,7 @@ object TransactionDataProducer {
         $"v.price".cast(DoubleType),
         $"v.type".cast(BooleanType).as("sell"),
         $"v.amount".cast(DoubleType))
-      .withWatermark("date", "1 second")
+      .withWatermark("date", "20 second")
       .distinct() // we need to use watermark to use distinct, otherwise it will keep everything in memory
       .as[Transaction]
   }

@@ -15,7 +15,7 @@ object TransactionDataProducerApp extends App {
   // In prod, should be a distributed filesystem
   val checkpointDir = "/tmp/coinyser/TransactionDataProducerApp"
   implicit val kafkaConfig: KafkaConfig = KafkaConfig(
-    topic = "ticker_btcusd",
+    topic = "transaction_btcusd",
     bootstrapServers = "localhost:9092",
     checkpointLocation = checkpointDir)
 

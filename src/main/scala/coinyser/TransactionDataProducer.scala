@@ -2,25 +2,64 @@ package coinyser
 
 import java.io.File
 import java.net.URL
+import java.time._
 import java.util.Properties
 
 import scala.collection.JavaConversions._
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
-import org.apache.spark.sql.{Dataset, Row, SparkSession}
+import org.apache.spark.sql.{Dataset, Row, SaveMode, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.StreamingQuery
 import org.apache.spark.sql.types._
 
 import scala.io.Source
 
-case class KafkaConfig(topic: String,
-                       bootstrapServers: String,
-                       checkpointLocation: String)
+case class AppConfig(topic: String,
+                     bootstrapServers: String,
+                     checkpointLocation: String,
+                     transactionStorePath: String)
+
+object TransactionDataBatchProducer {
+
+  def readTransactions(createSource: => Source)(implicit spark: SparkSession): Dataset[Transaction] = {
+    import spark.implicits._
+    val txSchema = Seq.empty[BitstampTransaction].toDS().schema
+    val schema = ArrayType(txSchema)
+    Seq(createSource.mkString).toDS()
+      .select(explode(from_json($"value".cast(StringType), schema)).alias("v"))
+      .select(
+        $"v.date".cast(LongType).cast(TimestampType).as("date"),
+        $"v.tid".cast(IntegerType),
+        $"v.price".cast(DoubleType),
+        $"v.type".cast(BooleanType).as("sell"),
+        $"v.amount".cast(DoubleType))
+      .as[Transaction]
+  }
+
+  def save(transactions: Dataset[Transaction], fromDateTime: OffsetDateTime, untilDateTime: OffsetDateTime)
+          (implicit appConfig: AppConfig): String = {
+    // TODO logger
+    println(s"Saving ${transactions.count()} from $fromDateTime until $untilDateTime")
+
+    import transactions.sparkSession.implicits._
+    val path = appConfig.transactionStorePath + "/" + fromDateTime.toLocalDate
+    transactions
+      .filter(
+        ($"date" >= lit(fromDateTime.toEpochSecond).cast(TimestampType)) &&
+          ($"date" < lit(untilDateTime.toEpochSecond).cast(TimestampType)))
+      .write
+      .mode(SaveMode.Append)
+      .parquet(path)
+    path
+  }
+
+}
+
 
 object TransactionDataProducer {
 
 
-  def start(url: URL)(implicit kafkaConfig: KafkaConfig, spark: SparkSession) = {
+  def start(url: URL)(implicit kafkaConfig: AppConfig, spark: SparkSession) = {
     val tickerStream = transactionReadStream(_ => Source.fromURL(url))
     kafkaWriteStream(tickerStream)
     //    consoleWriteStream(tickerStream)
@@ -38,7 +77,7 @@ object TransactionDataProducer {
 
 
   def kafkaWriteStream[A](tickerStream: Dataset[A])
-                         (implicit kafkaConfig: KafkaConfig, spark: SparkSession): StreamingQuery = {
+                         (implicit kafkaConfig: AppConfig, spark: SparkSession): StreamingQuery = {
     tickerStream
       .toJSON
       .writeStream

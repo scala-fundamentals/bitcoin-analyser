@@ -33,10 +33,12 @@ class MarketDataProducerSpec extends WordSpec with Matchers with BeforeAndAfterA
     FileUtils.deleteDirectory(checkpointDir)
   }
 
-  implicit val kafkaConfig: KafkaConfig = KafkaConfig(
+  implicit val kafkaConfig: AppConfig = AppConfig(
     topic = "ticker_btcusd",
     bootstrapServers = "localhost:9092",
-    checkpointLocation = checkpointDir.toString)
+    checkpointLocation = checkpointDir.toString,
+    transactionStorePath = "???"
+  )
 
   import spark.implicits._
 

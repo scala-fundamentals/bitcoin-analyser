@@ -5,10 +5,12 @@ import org.apache.spark.sql.SparkSession
 object BatchConsumerApp extends App {
   // In prod, should be a distributed filesystem
   val checkpointDir = "/tmp/coinyser/BatchConsumerApp"
-  implicit val kafkaConfig: KafkaConfig = KafkaConfig(
-    topic = "ticker_btcusd",
+  implicit val kafkaConfig: AppConfig = AppConfig(
+    topic = "transaction_btcusd",
     bootstrapServers = "localhost:9092",
-    checkpointLocation = checkpointDir)
+    checkpointLocation = checkpointDir,
+    transactionStorePath = "???"
+  )
 
 
   implicit val spark: SparkSession = SparkSession
@@ -16,5 +18,5 @@ object BatchConsumerApp extends App {
     .master("local[*]")
     .appName("BatchConsumer")
     .getOrCreate()
-  BatchConsumer.start
+  BatchConsumer.fromKafka
 }

@@ -14,10 +14,12 @@ bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic ticker_b
 object MarketDataProducerApp extends App {
   // In prod, should be a distributed filesystem
   val checkpointDir = "/tmp/coinyser/MarketDataProducerApp"
-  implicit val kafkaConfig: KafkaConfig = KafkaConfig(
+  implicit val kafkaConfig: AppConfig = AppConfig(
     topic = "ticker_btcusd",
     bootstrapServers = "localhost:9092",
-    checkpointLocation = checkpointDir)
+    checkpointLocation = checkpointDir,
+    transactionStorePath = "???"
+  )
 
 
   implicit val spark: SparkSession = SparkSession

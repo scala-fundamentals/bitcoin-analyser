@@ -17,13 +17,13 @@ import scala.io.Source
 object MarketDataProducer {
 
 
-  def start(url: URL)(implicit kafkaConfig: KafkaConfig, spark: SparkSession) = {
+  def start(url: URL)(implicit kafkaConfig: AppConfig, spark: SparkSession) = {
     val tickerStream = tickerReadStream(_ => Source.fromURL(url))
     kafkaWriteStream(tickerStream)
   }
 
   def kafkaWriteStream(tickerStream: Dataset[Ticker])
-                      (implicit kafkaConfig: KafkaConfig, spark: SparkSession): StreamingQuery = {
+                      (implicit kafkaConfig: AppConfig, spark: SparkSession): StreamingQuery = {
     tickerStream
       .toJSON
       .writeStream

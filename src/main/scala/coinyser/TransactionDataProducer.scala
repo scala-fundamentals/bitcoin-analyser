@@ -3,6 +3,7 @@ package coinyser
 import java.io.File
 import java.net.URL
 import java.time._
+import java.time.temporal.ChronoUnit
 import java.util.Properties
 
 import scala.collection.JavaConversions._
@@ -20,6 +21,44 @@ case class AppConfig(topic: String,
                      transactionStorePath: String)
 
 object TransactionDataBatchProducer {
+  // TODO ideally use a mocked Clock
+  def readSaveRepeatedly(intervalSeconds: Int, createSource: => Source)
+                        (implicit appConfig: AppConfig, spark: SparkSession) = {
+    def loop(prevTxs: Dataset[Transaction], prevEndInstant: Instant): Unit = {
+      Thread.sleep((intervalSeconds - 5) * 1000)
+
+      val start = truncateInstant(prevEndInstant, intervalSeconds)
+      val firstTxs = filterTxs(prevTxs, start, prevEndInstant)
+      // We are sure that lastTransactions contain all transaction until endInstant
+      val endInstant = Instant.now()
+      val lastTransactions = TransactionDataBatchProducer.readTransactions(createSource)
+      val end = truncateInstant(Instant.now(), intervalSeconds)
+      println("start         : " + start)
+      println("prevEndInstant: " + prevEndInstant)
+      println("endInstant    : " + endInstant)
+      println("end           : " + end)
+      if (start == end)
+        loop(lastTransactions, endInstant)
+      else {
+        require(prevEndInstant.getEpochSecond < end.getEpochSecond)
+
+        val tailTxs = filterTxs(lastTransactions, prevEndInstant, end)
+        TransactionDataBatchProducer.save(firstTxs union tailTxs, start)
+        loop(lastTransactions, endInstant)
+      }
+    }
+
+    // Not referentially transparent !! If you inline prevTxs, that won't work
+    val prevTxs = readTransactions(createSource)
+    val now = Instant.now()
+    loop(prevTxs, now)
+  }
+
+  // Truncates to the start of interval
+  def truncateInstant(instant: Instant, intervalSeconds: Int): Instant = {
+    Instant.ofEpochSecond(instant.getEpochSecond / intervalSeconds * intervalSeconds)
+
+  }
 
   def readTransactions(createSource: => Source)(implicit spark: SparkSession): Dataset[Transaction] = {
     import spark.implicits._
@@ -36,17 +75,22 @@ object TransactionDataBatchProducer {
       .as[Transaction]
   }
 
-  def save(transactions: Dataset[Transaction], fromDateTime: OffsetDateTime, untilDateTime: OffsetDateTime)
+  def filterTxs(transactions: Dataset[Transaction], fromInstant: Instant, untilInstant: Instant)
+  : Dataset[Transaction] = {
+    import transactions.sparkSession.implicits._
+    transactions.filter(
+      ($"date" >= lit(fromInstant.getEpochSecond).cast(TimestampType)) &&
+        ($"date" < lit(untilInstant.getEpochSecond).cast(TimestampType)))
+  }
+
+  def save(transactions: Dataset[Transaction], startInstant: Instant)
           (implicit appConfig: AppConfig): String = {
     // TODO logger
-    println(s"Saving ${transactions.count()} from $fromDateTime until $untilDateTime")
+    println(s"Saving ${transactions.count()}")
 
     import transactions.sparkSession.implicits._
-    val path = appConfig.transactionStorePath + "/" + fromDateTime.toLocalDate
+    val path = appConfig.transactionStorePath + "/" + OffsetDateTime.ofInstant(startInstant, ZoneOffset.UTC).toLocalDate
     transactions
-      .filter(
-        ($"date" >= lit(fromDateTime.toEpochSecond).cast(TimestampType)) &&
-          ($"date" < lit(untilDateTime.toEpochSecond).cast(TimestampType)))
       .write
       .mode(SaveMode.Append)
       .parquet(path)

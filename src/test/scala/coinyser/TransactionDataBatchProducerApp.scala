@@ -32,7 +32,7 @@ object TransactionDataBatchProducerApp extends App {
   val transactions: Dataset[Transaction] = TransactionDataBatchProducer.readTransactions(
     Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=day")))
 
-  TransactionDataBatchProducer.save(transactions, start, end)
+//  TransactionDataBatchProducer.save(transactions, start, end)
 
   // TODO in Zeppelin:
   // val ds = spark.read.parquet("/tmp/coinyser/transaction/2018-07-26")
@@ -51,7 +51,7 @@ object TransactionDataBatchProducerApp extends App {
       Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=minute")))
 
     val transactionsToSave = (previousMinuteTransactions union lastMinuteTransactions).distinct()
-    TransactionDataBatchProducer.save(transactionsToSave, start, end)
+//    TransactionDataBatchProducer.save(transactionsToSave, start, end)
     appendLastMinuteTransactions(lastMinuteTransactions)
   }
 }

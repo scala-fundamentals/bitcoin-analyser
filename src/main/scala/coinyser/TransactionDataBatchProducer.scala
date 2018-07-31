@@ -3,6 +3,7 @@ package coinyser
 import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import java.util.concurrent.TimeUnit
 
+import cats.Monad
 import cats.effect.{IO, Timer}
 import org.apache.spark.sql.functions.{explode, from_json, lit}
 import org.apache.spark.sql.types._
@@ -10,46 +11,53 @@ import org.apache.spark.sql.{Dataset, SaveMode, SparkSession}
 
 import scala.annotation.tailrec
 import scala.concurrent.duration._
+import cats.implicits._
 
 object TransactionDataBatchProducer {
+  /** Maximum time required to read transactions from the API */
+  val MaxReadTime = 5
+
   def readSaveRepeatedly(intervalSeconds: Int, jsonIO: IO[String])
                         (implicit appConfig: AppConfig, spark: SparkSession, timer: Timer[IO]): IO[Unit] = {
-    def loop(prevTxs: Dataset[Transaction], prevEndInstant: Instant): IO[Unit] = {
+    def loop(prevTxs: Dataset[Transaction], prevEndInstant: Instant): IO[(Dataset[Transaction], Instant)] = {
       for {
-        _ <- IO.sleep((intervalSeconds - 5).seconds)
+        _ <- IO.sleep((intervalSeconds - MaxReadTime).seconds)
 
         start = truncateInstant(prevEndInstant, intervalSeconds)
-        firstTxs = filterTxs(prevTxs, start, prevEndInstant)
-        // We are sure that lastTransactions contain all transaction until endInstant
-        beforeReadInstant <- now
+        // We are sure that lastTransactions contain all transaction until beforeRead
+        beforeRead <- currentInstant
         lastTransactions <- TransactionDataBatchProducer.readTransactions(jsonIO)
-        end = truncateInstant(beforeReadInstant, intervalSeconds) // TODO should be beforeReadInstant, we might miss a transaction
-//        _ <- IO {
-//          println("start             : " + start)
-//          println("prevEndInstant    : " + prevEndInstant)
-//          println("beforeReadInstant : " + beforeReadInstant)
-//          println("end               : " + end)
-//        }
-        _ <-
-          if (start == end)
-            loop(lastTransactions, beforeReadInstant)
+        end = truncateInstant(beforeRead, intervalSeconds)
+        //        _ <- IO {
+        //          println("start             : " + start)
+        //          println("prevEndInstant    : " + prevEndInstant)
+        //          println("beforeReadInstant : " + beforeReadInstant)
+        //          println("end               : " + end)
+        //        }
+        savedParquetPath <-
+          if (start == end) {
+            IO.unit
+          }
           else {
             require(prevEndInstant.getEpochSecond < end.getEpochSecond)
+            val firstTxs = filterTxs(prevTxs, start, prevEndInstant)
             val tailTxs = filterTxs(lastTransactions, prevEndInstant, end)
-            TransactionDataBatchProducer.save(firstTxs union tailTxs, start).flatMap(_ =>
-              loop(lastTransactions, beforeReadInstant))
+            TransactionDataBatchProducer.save(firstTxs union tailTxs, start)
           }
 
-      } yield ()
+      } yield (lastTransactions, beforeRead)
     }
 
-    readTransactions(jsonIO) flatMap { prevTxs =>
-      val now = Instant.now()
-      loop(prevTxs, now)
-    }
+    for {
+      prevTxs <- readTransactions(jsonIO)
+      prevEndInstant <- currentInstant
+      _ <- (prevTxs, prevEndInstant).tailRecM {
+        case (txs, instant) => loop(txs, instant).map(_.asLeft)
+      }
+    } yield ()
   }
 
-  def now(implicit timer: Timer[IO]): IO[Instant] =
+  def currentInstant(implicit timer: Timer[IO]): IO[Instant] =
     timer.clockRealTime(TimeUnit.SECONDS) map Instant.ofEpochSecond
 
   // Truncates to the start of interval

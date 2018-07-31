@@ -20,7 +20,7 @@ object TransactionDataBatchProducer {
   /** Maximum time required to read transactions from the API */
   val MaxReadTime: FiniteDuration = 5.seconds
 
-  def processRepeatedly(intervalSeconds: Int, jsonTxs: IO[String])
+  def processRepeatedly(initialJsonTxs: IO[String], jsonTxs: IO[String])
                        (implicit appContext: AppContext): IO[Unit] = {
     import appContext._
 

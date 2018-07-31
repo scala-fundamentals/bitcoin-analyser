@@ -1,13 +1,13 @@
 package coinyser
 
 import java.net.URL
-import java.time.temporal.{ChronoUnit, TemporalUnit}
-import java.time.{LocalDate, OffsetDateTime, ZoneOffset}
 
-import org.apache.spark.sql.{Dataset, SparkSession}
+import cats.effect.IO
+import org.apache.spark.sql.SparkSession
 
-import scala.annotation.tailrec
+import scala.concurrent.duration._
 import scala.io.Source
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object TransactionDataBatchProducerApp extends App {
   // In prod, should be a distributed filesystem
@@ -16,9 +16,9 @@ object TransactionDataBatchProducerApp extends App {
     topic = "transaction_btcusd",
     bootstrapServers = "localhost:9092",
     checkpointLocation = checkpointDir,
-    transactionStorePath = "/tmp/coinyser/transaction"
+    transactionStorePath = "/tmp/coinyser/transaction",
+    intervalBetweenReads = 1.minute
   )
-
 
   implicit val spark: SparkSession = SparkSession
     .builder
@@ -26,20 +26,21 @@ object TransactionDataBatchProducerApp extends App {
     .appName("coinyser")
     .getOrCreate()
 
-  val now = OffsetDateTime.now(ZoneOffset.UTC)
-  val start = now.truncatedTo(ChronoUnit.DAYS)
-  val end: OffsetDateTime = now.truncatedTo(ChronoUnit.MINUTES)
-//  val transactions: Dataset[Transaction] = TransactionDataBatchProducer.readTransactions(
-//    Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=day")))
+  implicit val appContext: AppContext = new AppContext()
 
-//  TransactionDataBatchProducer.save(transactions, start, end)
+  val initialJsonTxs = IO {
+    Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=day")).mkString
+  }
+
+  val nextJsonTxs = IO {
+    Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=minute")).mkString
+  }
+  TransactionDataBatchProducer.processRepeatedly(initialJsonTxs, nextJsonTxs).unsafeRunSync()
 
   // TODO in Zeppelin:
   // val ds = spark.read.parquet("/tmp/coinyser/transaction/2018-07-26")
   // ds.groupBy(window($"date", "1 hour").as("w")).agg(count($"tid")).sort($"w").show(100,false)
-
-  import spark.implicits._
-//  appendLastMinuteTransactions(spark.emptyDataset[Transaction])
+  //  appendLastMinuteTransactions(spark.emptyDataset[Transaction])
 
 
 }

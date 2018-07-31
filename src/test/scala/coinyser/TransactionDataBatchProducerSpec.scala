@@ -81,7 +81,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
       val intervalSeconds = 10
       val io = for {
         _ <- IO.shift
-        _ <- TransactionDataBatchProducer.processRepeatedly(intervalSeconds, txIO)
+        _ <- TransactionDataBatchProducer.processRepeatedly(txIO, txIO)
       } yield ()
       io.unsafeRunTimed(35.seconds)
 

@@ -41,8 +41,11 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
     topic = "transaction_btcusd",
     bootstrapServers = "localhost:9092",
     checkpointLocation = checkpointDir.toString,
-    transactionStorePath = transactionStoreDir.toString
+    transactionStorePath = transactionStoreDir.toString,
+    intervalBetweenReads = 10.seconds
   )
+  import scala.concurrent.ExecutionContext.Implicits.global
+  implicit val appContext: AppContext = new AppContext
 
   import spark.implicits._
 
@@ -75,11 +78,10 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
         "[" + transactions.mkString(",") + "]"
       }
 
-      import scala.concurrent.ExecutionContext.Implicits.global
       val intervalSeconds = 10
       val io = for {
         _ <- IO.shift
-        _ <- TransactionDataBatchProducer.readSaveRepeatedly(intervalSeconds, txIO)
+        _ <- TransactionDataBatchProducer.processRepeatedly(intervalSeconds, txIO)
       } yield ()
       io.unsafeRunTimed(35.seconds)
 

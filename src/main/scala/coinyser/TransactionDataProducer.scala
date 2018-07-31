@@ -1,28 +1,20 @@
 package coinyser
 
-import java.io.File
 import java.net.URL
-import java.time._
-import java.time.temporal.ChronoUnit
-import java.util.Properties
 
-import cats.effect.IO
-
-import scala.collection.JavaConversions._
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
-import org.apache.spark.sql.{Dataset, Row, SaveMode, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.StreamingQuery
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{Dataset, SparkSession}
 
+import scala.concurrent.duration.FiniteDuration
 import scala.io.Source
 
 case class AppConfig(topic: String,
                      bootstrapServers: String,
                      checkpointLocation: String,
+                     intervalBetweenReads: FiniteDuration,
                      transactionStorePath: String)
-
-
 
 
 object TransactionDataProducer {

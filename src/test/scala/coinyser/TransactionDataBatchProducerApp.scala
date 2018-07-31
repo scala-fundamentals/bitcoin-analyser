@@ -29,8 +29,8 @@ object TransactionDataBatchProducerApp extends App {
   val now = OffsetDateTime.now(ZoneOffset.UTC)
   val start = now.truncatedTo(ChronoUnit.DAYS)
   val end: OffsetDateTime = now.truncatedTo(ChronoUnit.MINUTES)
-  val transactions: Dataset[Transaction] = TransactionDataBatchProducer.readTransactions(
-    Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=day")))
+//  val transactions: Dataset[Transaction] = TransactionDataBatchProducer.readTransactions(
+//    Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=day")))
 
 //  TransactionDataBatchProducer.save(transactions, start, end)
 
@@ -39,19 +39,7 @@ object TransactionDataBatchProducerApp extends App {
   // ds.groupBy(window($"date", "1 hour").as("w")).agg(count($"tid")).sort($"w").show(100,false)
 
   import spark.implicits._
-  appendLastMinuteTransactions(spark.emptyDataset[Transaction])
+//  appendLastMinuteTransactions(spark.emptyDataset[Transaction])
 
-  @tailrec
-  def appendLastMinuteTransactions(previousMinuteTransactions: Dataset[Transaction]): Unit = {
-    Thread.sleep(50000)
-    val now = OffsetDateTime.now(ZoneOffset.UTC)
-    val start = now.truncatedTo(ChronoUnit.MINUTES)
-    val end = now.plusMinutes(1).truncatedTo(ChronoUnit.MINUTES)
-    val lastMinuteTransactions = TransactionDataBatchProducer.readTransactions(
-      Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=minute")))
 
-    val transactionsToSave = (previousMinuteTransactions union lastMinuteTransactions).distinct()
-//    TransactionDataBatchProducer.save(transactionsToSave, start, end)
-    appendLastMinuteTransactions(lastMinuteTransactions)
-  }
 }

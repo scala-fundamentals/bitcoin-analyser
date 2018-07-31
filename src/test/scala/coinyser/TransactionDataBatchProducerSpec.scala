@@ -5,19 +5,21 @@ import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.OffsetDateTime
 
+import cats.effect.IO
 import coinyser.TransactionDataProducerSpec._
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.streaming.MemoryStream
+import org.apache.spark.sql.functions.{count, window}
 import org.apache.spark.sql.streaming.OutputMode
 import org.scalactic.TypeCheckedTripleEquals
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
+import org.scalatest.{BeforeAndAfterAll, EitherValues, Matchers, WordSpec}
 
 import scala.concurrent.duration._
 import scala.io.Source
 
-class TransactionDataBatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll with TypeCheckedTripleEquals with Eventually {
+class TransactionDataBatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll with TypeCheckedTripleEquals with Eventually with EitherValues {
 
   override implicit def patienceConfig: PatienceConfig = new PatienceConfig(10.seconds, 100.millis)
 
@@ -35,7 +37,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
     FileUtils.deleteDirectory(transactionStoreDir)
   }
 
-  implicit val kafkaConfig: AppConfig = AppConfig(
+  implicit val appConfig: AppConfig = AppConfig(
     topic = "transaction_btcusd",
     bootstrapServers = "localhost:9092",
     checkpointLocation = checkpointDir.toString,
@@ -49,12 +51,12 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
   val transaction2 = Transaction(date = new Timestamp(1532365693000L), tid = 70683281, price = 7739.99, sell = false, amount = 0.00148564)
 
   "TransactionDataBatchProducer.readTransactions" should {
-    "create a Dataset[Transaction] from a constant Source" in {
-      val source = Source.fromString(
+    "create a Dataset[Transaction] from a Json String" in {
+      val txIO = IO(
         """[{"date": "1532365695", "tid": "70683282", "price": "7740.00", "type": "0", "amount": "0.10041719"},
           |{"date": "1532365693", "tid": "70683281", "price": "7739.99", "type": "0", "amount": "0.00148564"}]""".stripMargin)
 
-      val ds: Dataset[Transaction] = TransactionDataBatchProducer.readTransactions(source)
+      val ds: Dataset[Transaction] = TransactionDataBatchProducer.readTransactions(txIO).unsafeRunSync()
       val data = ds.collect()
       data should contain theSameElementsAs Seq(transaction1, transaction2)
     }
@@ -64,15 +66,29 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
 
   "TransactionDataBatchProducer.readSaveRepeatedly" should {
     "fetch new transactions every 10s and save them" in {
-      def source = Source.fromString {
+      def txIO = IO {
         val now = OffsetDateTime.now().toEpochSecond
         val transactions = Seq.tabulate(10)(i =>
           s"""{"date": "${now - i}", "tid": "${now - i}", "price": "7740.00", "type": "0", "amount": "0.10041719"}"""
         )
         "[" + transactions.mkString(",") + "]"
       }
-      TransactionDataBatchProducer.readSaveRepeatedly(10, source)
 
+      import scala.concurrent.ExecutionContext.Implicits.global
+      val intervalSeconds = 10
+      val io = for {
+        _ <- IO.shift
+        _ <- TransactionDataBatchProducer.readSaveRepeatedly(intervalSeconds, txIO)
+      } yield ()
+      io.unsafeRunTimed(35.seconds)
+
+      val savedTransactions = spark.read.parquet(appConfig.transactionStorePath + "/2018-07-31").as[Transaction]
+      val counts = savedTransactions
+        .groupBy(window($"date", "10 seconds").as("window"))
+        .agg(count($"tid").as("count"))
+        .sort($"window")
+      counts.show(10000, false)
+      counts.select($"count".as[Long]).collect().toSeq should === (Seq.fill(3)(intervalSeconds.toLong))
     }
   }
 

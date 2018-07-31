@@ -67,6 +67,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
   "TransactionDataBatchProducer.readSaveRepeatedly" should {
     "fetch new transactions every 10s and save them" in {
       def txIO = IO {
+        // TODO use IO clock
         val now = OffsetDateTime.now().toEpochSecond
         val transactions = Seq.tabulate(10)(i =>
           s"""{"date": "${now - i}", "tid": "${now - i}", "price": "7740.00", "type": "0", "amount": "0.10041719"}"""
@@ -82,7 +83,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
       } yield ()
       io.unsafeRunTimed(35.seconds)
 
-      val savedTransactions = spark.read.parquet(appConfig.transactionStorePath + "/2018-07-31").as[Transaction]
+      val savedTransactions = spark.read.parquet(appConfig.transactionStorePath).as[Transaction]
       val counts = savedTransactions
         .groupBy(window($"date", "10 seconds").as("window"))
         .agg(count($"tid").as("count"))
@@ -91,6 +92,8 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
       counts.select($"count".as[Long]).collect().toSeq should === (Seq.fill(3)(intervalSeconds.toLong))
     }
   }
+
+  // TODO test for partition dt
 
 
 }

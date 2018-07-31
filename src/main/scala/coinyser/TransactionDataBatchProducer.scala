@@ -8,6 +8,7 @@ import org.apache.spark.sql.functions.{explode, from_json, lit}
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Dataset, SaveMode, SparkSession}
 
+import scala.annotation.tailrec
 import scala.concurrent.duration._
 
 object TransactionDataBatchProducer {
@@ -35,8 +36,8 @@ object TransactionDataBatchProducer {
           else {
             require(prevEndInstant.getEpochSecond < end.getEpochSecond)
             val tailTxs = filterTxs(lastTransactions, prevEndInstant, end)
-            TransactionDataBatchProducer.save(firstTxs union tailTxs, start)
-            loop(lastTransactions, beforeReadInstant)
+            TransactionDataBatchProducer.save(firstTxs union tailTxs, start).flatMap(_ =>
+              loop(lastTransactions, beforeReadInstant))
           }
 
       } yield ()
@@ -82,15 +83,17 @@ object TransactionDataBatchProducer {
   }
 
   def save(transactions: Dataset[Transaction], startInstant: Instant)
-          (implicit appConfig: AppConfig): String = {
+          (implicit appConfig: AppConfig): IO[String] = {
     // TODO logger
     println(s"Saving ${transactions.count()}")
-    val path = appConfig.transactionStorePath + "/" + OffsetDateTime.ofInstant(startInstant, ZoneOffset.UTC).toLocalDate
-    transactions
-      .write
-      .mode(SaveMode.Append)
-      .parquet(path)
-    path
+    val path = appConfig.transactionStorePath + "/dt=" + OffsetDateTime.ofInstant(startInstant, ZoneOffset.UTC).toLocalDate
+    IO {
+      transactions
+        .write
+        .mode(SaveMode.Append)
+        .parquet(path)
+      path
+    }
   }
 
 }

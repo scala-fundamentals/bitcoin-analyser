@@ -19,10 +19,12 @@ import org.scalatest.{BeforeAndAfterAll, EitherValues, Matchers, WordSpec}
 
 import scala.concurrent.duration._
 import scala.io.Source
+import TransactionDataBatchProducerSpec.parseTransaction
 
 class TransactionDataBatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll with TypeCheckedTripleEquals with Eventually with EitherValues {
 
   override implicit def patienceConfig: PatienceConfig = new PatienceConfig(10.seconds, 100.millis)
+
   sys.props("user.timezone") = "UTC"
 
   implicit val spark: SparkSession = SparkSession
@@ -36,7 +38,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
 
   override def afterAll(): Unit = {
     FileUtils.deleteDirectory(checkpointDir)
-//    FileUtils.deleteDirectory(transactionStoreDir)
+    //    FileUtils.deleteDirectory(transactionStoreDir)
   }
 
   implicit val appConfig: AppConfig = AppConfig(
@@ -89,84 +91,72 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
 
   "TransactionDataBatchProducer.processOneBatch" should {
     "Wait a bit of time, fetch the next batch of transactions, and save a filtered union of the previous and the last batch" in {
-      /*
-start      : 2018-08-01T10:21:00Z
-previousEnd: 2018-08-01T10:21:20Z
-lastEnd    : 2018-08-01T10:22:12Z
-end        : 2018-08-01T10:22:00Z
-Set(71272533, 71272540, 71272521, 71272528, 71272554, 71272536, 71272512, 71272545, 71272557, 71272546, 71272525, 71272522, 71272537, 71272548, 71272538, 71272535, 71272520, 71272529, 71272562, 71272555, 71272526, 71272530, 71272541, 71272516, 71272547, 71272534, 71272539, 71272556, 71272561, 71272527, 71272542, 71272559)
-Saving 32
-18/08/01 12:22:22 INFO FileOutputCommitter: Saved output of task 'attempt_20180801122222_0044_m_000001_0' to file:/tmp/coinyser/transaction/dt=2018-08-01/_temporary/0/task_20180801122222_0044_m_000001
-18/08/01 12:22:22 INFO FileOutputCommitter: Saved output of task 'attempt_20180801122222_0044_m_000000_0' to file:/tmp/coinyser/transaction/dt=2018-08-01/_temporary/0/task_20180801122222_0044_m_000000
-start      : 2018-08-01T10:22:00Z
-previousEnd: 2018-08-01T10:22:12Z
-lastEnd    : 2018-08-01T10:23:07Z
-end        : 2018-08-01T10:23:00Z
-Set(71272579, 71272582, 71272628, 71272596, 71272614, 71272618, 71272622, 71272557, 71272595, 71272602, 71272623, 71272562, 71272616, 71272555, 71272594, 71272631, 71272603, 71272625, 71272615, 71272556, 71272561, 71272559, 71272630)
-Saving 20
-       */
+      // TODO timezone
+      val transactions = Seq(
+        "|2018-08-02 07:22:34|71319732|7657.58|true |0.021762  |",
+        "|2018-08-02 07:22:47|71319735|7663.85|false|0.01385517|",
+        "|2018-08-02 07:23:09|71319738|7663.85|false|0.03782426|",
+        "|2018-08-02 07:23:11|71319739|7663.86|false|0.15750809|",
+        "|2018-08-02 07:23:40|71319751|7661.49|true |0.1       |",
+        "|2018-08-02 07:23:41|71319752|7661.49|true |0.04437627|",
+        "|2018-08-02 07:23:41|71319753|7661.49|true |0.05562373|",
+        "|2018-08-02 07:23:41|71319754|7661.49|true |0.0160586 |",
+        "|2018-08-02 07:23:44|71319755|7661.48|false|0.1799    |",
+        "|2018-08-02 07:24:04|71319758|7661.46|true |0.012848  |",
+        "|2018-08-02 07:24:04|71319760|7661.46|false|0.01852   |",
+        "|2018-08-02 07:24:05|71319761|7657.58|true |0.028632  |",
+        "|2018-08-02 07:24:42|71319773|7661.47|false|0.017882  |",
+        "|2018-08-02 07:24:45|71319774|7662.68|false|0.016105  |",
+        "|2018-08-02 07:24:45|71319775|7663.85|false|0.03149464|",
+        "|2018-08-02 07:24:46|71319776|7663.85|false|0.04029315|",
+        "|2018-08-02 07:24:50|71319779|7663.85|true |0.03602883|",
+        "|2018-08-02 07:24:50|71319780|7663.86|false|0.0777    |",
+        "|2018-08-02 07:25:08|71319782|7663.85|true |0.00181743|",
+        "|2018-08-02 07:25:14|71319783|7663.85|true |0.04211058|",
+        "|2018-08-02 07:25:14|71319784|7663.85|true |0.01700019|",
+        "|2018-08-02 07:25:15|71319785|7663.85|false|0.00951691|",
+        "|2018-08-02 07:25:45|71319789|7661.68|true |0.0076989 |",
+        "|2018-08-02 07:25:51|71319793|7661.69|false|0.02855881|",
+        "|2018-08-02 07:25:51|71319794|7661.68|true |0.04980948|",
+        "|2018-08-02 07:25:52|71319795|7661.68|true |0.01378989|",
+        "|2018-08-02 07:26:17|71319799|7661.38|false|0.01690441|",
+        "|2018-08-02 07:26:18|71319800|7661.38|true |0.1       |",
+        "|2018-08-02 07:26:19|71319801|7663.43|false|0.1       |",
+        "|2018-08-02 07:26:19|71319802|7663.86|false|0.12409542|"
+      ).map(parseTransaction)
 
-      def parseTransaction(s: String): Transaction =
-        s.split('|').toList match {
-          case _ +: date +: tid +: amount +: sell +: price +: Nil =>
-            Transaction(Timestamp.valueOf(date), tid.toInt, price.toDouble, sell.trim.toBoolean, amount.toDouble)
-        }
+      val txs0 = transactions.filter(tx => Set(71319739, 71319738, 71319735, 71319732).contains(tx.tid))
+      val txs1 = transactions.filter(tx => Set(71319760, 71319751, 71319752, 71319755, 71319761, 71319754, 71319758, 71319753).contains(tx.tid))
+      val txs2 = transactions.filter(tx => Set(71319773, 71319779, 71319776, 71319780, 71319775, 71319774).contains(tx.tid))
+      val txs3 = transactions.filter(tx => Set(71319783, 71319784, 71319793, 71319794, 71319785, 71319782, 71319795, 71319789).contains(tx.tid))
+      val expectedTxs = transactions.filter(tx => Set(71319738, 71319739, 71319751, 71319752, 71319753, 71319754, 71319755, 71319758, 71319760, 71319761, 71319773, 71319774, 71319775, 71319776, 71319779, 71319780).contains(tx.tid))
 
-      val transactions1 = Seq(
-        // TODO add a few before 2018-08-01T10:22:00Z to have some saving in the first batch
-        "|2018-08-01 12:22:04|71272546|7552.38|true |0.07275619|",
-        "|2018-08-01 12:22:04|71272547|7552.37|true |0.02724381|",
-        "|2018-08-01 12:22:04|71272548|7552.37|true |0.1       |",
-        "|2018-08-01 12:22:12|71272554|7552.39|false|0.499052  |",
-        "|2018-08-01 12:22:13|71272555|7552.37|true |0.1       |",
-        "|2018-08-01 12:22:13|71272556|7552.39|false|0.40094701|",
-        "|2018-08-01 12:22:14|71272557|7552.95|false|0.0036    |",
-        "|2018-08-01 12:22:14|71272559|7552.95|false|0.119455  |",
-        "|2018-08-01 12:22:15|71272561|7552.95|false|0.00761599|",
-        "|2018-08-01 12:22:16|71272562|7552.41|true |0.599052  |").map(parseTransaction)
-      val transactions2 = Seq(
-        "|2018-08-01 12:22:13|71272555|7552.37|true |0.1       |",
-        "|2018-08-01 12:22:13|71272556|7552.39|false|0.40094701|",
-        "|2018-08-01 12:22:14|71272557|7552.95|false|0.0036    |",
-        "|2018-08-01 12:22:14|71272559|7552.95|false|0.119455  |",
-        "|2018-08-01 12:22:15|71272561|7552.95|false|0.00761599|",
-        "|2018-08-01 12:22:16|71272562|7552.41|true |0.599052  |",
-        "|2018-08-01 12:22:24|71272579|7552.42|false|0.02420833|",
-        "|2018-08-01 12:22:25|71272582|7552.41|true |0.020948  |",
-        "|2018-08-01 12:22:30|71272594|7550.79|false|0.05      |",
-        "|2018-08-01 12:22:32|71272595|7549.92|false|0.4210102 |",
-        "|2018-08-01 12:22:33|71272596|7549.92|false|0.06033534|",
-        "|2018-08-01 12:22:40|71272602|7549.69|false|0.20200291|",
-        "|2018-08-01 12:22:41|71272603|7549.68|true |0.1       |",
-        "|2018-08-01 12:22:48|71272614|7549.69|false|0.0024224 |",
-        "|2018-08-01 12:22:49|71272615|7549.68|true |0.1       |",
-        "|2018-08-01 12:22:49|71272616|7549.68|true |0.42      |",
-        "|2018-08-01 12:22:58|71272618|7549.69|false|0.09720503|").map(parseTransaction)
-
-      FakeTimer.clockRealTimeInMillis = Instant.parse("2018-08-01T10:21:32Z").toEpochMilli
-      val ((ds1, instant1), (ds2, instant2)) = {
+      FakeTimer.clockRealTimeInMillis = Instant.parse("2018-08-02T06:23:32Z").toEpochMilli
+      val ((ds1, instant1), (ds2, instant2), (ds3, instant3)) = {
         for {
-          (tuple1) <- TransactionDataBatchProducer.processOneBatch(
-            IO(transactions1.toDS()),
-            Seq.empty[Transaction].toDS(),
-            Instant.parse("2018-08-01T10:21:20Z"))
+          tuple1 <- TransactionDataBatchProducer.processOneBatch(
+            IO(txs1.toDS()),
+            txs0.toDS(),
+            Instant.parse("2018-08-02T06:23:26Z"))
 
-          (tuple2) <- TransactionDataBatchProducer.processOneBatch(
-            IO(transactions2.toDS()),
+          tuple2 <- TransactionDataBatchProducer.processOneBatch(
+            IO(txs2.toDS()),
             tuple1._1,
             tuple1._2)
-        } yield (tuple1, tuple2)
+
+          tuple3 <- TransactionDataBatchProducer.processOneBatch(
+            IO(txs3.toDS()),
+            tuple2._1,
+            tuple2._2)
+        } yield (tuple1, tuple2, tuple3)
       }.unsafeRunSync()
-      // should fail with 71272554 missing
-      // => should have fetched it earlier ?
 
       val savedTransactions = spark.read.parquet(appConfig.transactionStorePath).as[Transaction].collect()
-      savedTransactions.map(_.tid).toSet should === ((transactions1 ++ transactions2).map(_.tid).toSet)
-
-
+      savedTransactions.map(_.tid).toSet should ===(expectedTxs.map(_.tid).toSet)
     }
 
 
+    // TODO improve this test to highlight the scenario above
     "TransactionDataBatchProducer.readSaveRepeatedly" should {
       "fetch new transactions every 10s and save them" in {
         def txIO = IO {
@@ -200,5 +190,14 @@ Saving 20
 
   }
 
+
+}
+
+object TransactionDataBatchProducerSpec {
+  def parseTransaction(s: String): Transaction =
+    s.split('|').toList match {
+      case _ +: date +: tid +: amount +: sell +: price +: Nil =>
+        Transaction(Timestamp.valueOf(date), tid.toInt, price.toDouble, sell.trim.toBoolean, amount.toDouble)
+    }
 
 }

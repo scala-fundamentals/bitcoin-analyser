@@ -10,6 +10,8 @@ import scala.io.Source
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object TransactionDataBatchProducerApp extends App {
+  sys.props("user.timezone") = "UTC"
+
   // In prod, should be a distributed filesystem
   val checkpointDir = "/tmp/coinyser/TransactionDataProducerApp"
   implicit val appConfig: AppConfig = AppConfig(

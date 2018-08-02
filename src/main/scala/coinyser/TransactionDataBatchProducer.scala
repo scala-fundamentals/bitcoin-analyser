@@ -58,18 +58,18 @@ object TransactionDataBatchProducer {
         println("end        : " + end)
         println(lastTransactions.map(_.tid).collect().toSet)
       }
-      savedParquetPath <-
+      transactions <-
         if (start == end) {
-          IO.unit
+          IO.pure((previousTransactions union lastTransactions).distinct())
         }
         else {
           require(previousEnd.getEpochSecond < end.getEpochSecond)
           val firstTxs = filterTxs(previousTransactions, start, previousEnd)
           val tailTxs = filterTxs(lastTransactions, previousEnd, end)
-          TransactionDataBatchProducer.save(firstTxs union tailTxs, start)
+          TransactionDataBatchProducer.save(firstTxs union tailTxs, start).map(_ => lastTransactions)
         }
 
-    } yield (lastTransactions, lastEnd)
+    } yield (transactions, lastEnd)
   }
 
 
@@ -101,10 +101,11 @@ object TransactionDataBatchProducer {
   def filterTxs(transactions: Dataset[Transaction], fromInstant: Instant, untilInstant: Instant)
   : Dataset[Transaction] = {
     import transactions.sparkSession.implicits._
-    println(s"filtering ${transactions.count()} from $fromInstant until $untilInstant")
-    transactions.filter(
+    val filtered = transactions.filter(
       ($"date" >= lit(fromInstant.getEpochSecond).cast(TimestampType)) &&
         ($"date" < lit(untilInstant.getEpochSecond).cast(TimestampType)))
+    println(s"filtered ${filtered.count()}/${transactions.count()} from $fromInstant until $untilInstant")
+    filtered
   }
 
   def save(transactions: Dataset[Transaction], startInstant: Instant)

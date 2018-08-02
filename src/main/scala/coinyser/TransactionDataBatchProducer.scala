@@ -18,37 +18,46 @@ class AppContext(implicit val config: AppConfig,
 
 object TransactionDataBatchProducer {
   /** Maximum time required to read transactions from the API */
-  val MaxReadTime: FiniteDuration = 5.seconds
+  val MaxReadTime: FiniteDuration = 15.seconds
+  /** Number of seconds required by the API to make a transaction visible */
+  val ApiLag: FiniteDuration = 5.seconds
+
 
   def processRepeatedly(initialJsonTxs: IO[String], jsonTxs: IO[String])
                        (implicit appContext: AppContext): IO[Unit] = {
     import appContext._
 
     for {
-      prevTxs <- readTransactions(jsonTxs)
+      prevTxs <- readTransactions(initialJsonTxs)
       prevEndInstant <- currentInstant
       _ <- Monad[IO].tailRecM((prevTxs, prevEndInstant)) {
-        case (txs, instant) => processOneBatch(jsonTxs, txs, instant).map(_.asLeft)
+        case (txs, instant) => processOneBatch(readTransactions(jsonTxs), txs, instant).map(_.asLeft)
       }
     } yield ()
   }
 
-  def processOneBatch(jsonTxs: IO[String], previousTransactions: Dataset[Transaction], previousEnd: Instant)(implicit appCtx: AppContext): IO[(Dataset[Transaction], Instant)] = {
+  def processOneBatch(lastTransactionsIO: IO[Dataset[Transaction]], previousTransactions: Dataset[Transaction], previousEnd: Instant)(implicit appCtx: AppContext): IO[(Dataset[Transaction], Instant)] = {
     import appCtx._
+    import spark.implicits._
+
     for {
       _ <- IO.sleep(config.intervalBetweenReads - MaxReadTime)
 
+      // TODO pass start as argument so that we can truncate to the start of day
       start = truncateInstant(previousEnd, config.intervalBetweenReads)
-      // We are sure that lastTransactions contain all transaction until beforeRead
       beforeRead <- currentInstant
-      lastTransactions <- TransactionDataBatchProducer.readTransactions(jsonTxs)
-      end = truncateInstant(beforeRead, config.intervalBetweenReads)
-      //        _ <- IO {
-      //          println("start             : " + start)
-      //          println("prevEndInstant    : " + prevEndInstant)
-      //          println("beforeReadInstant : " + beforeReadInstant)
-      //          println("end               : " + end)
-      //        }
+      // We are sure that lastTransactions contain all transactions until lastEnd
+      lastEnd = beforeRead.minusSeconds(ApiLag.toSeconds)
+      lastTransactions <- lastTransactionsIO
+      end = truncateInstant(lastEnd, config.intervalBetweenReads)
+      _ <- IO {
+        println("start      : " + start)
+        println("previousEnd: " + previousEnd)
+        println("lastEnd    : " + lastEnd)
+        println("beforeRead : " + beforeRead)
+        println("end        : " + end)
+        println(lastTransactions.map(_.tid).collect().toSet)
+      }
       savedParquetPath <-
         if (start == end) {
           IO.unit
@@ -60,7 +69,7 @@ object TransactionDataBatchProducer {
           TransactionDataBatchProducer.save(firstTxs union tailTxs, start)
         }
 
-    } yield (lastTransactions, beforeRead)
+    } yield (lastTransactions, lastEnd)
   }
 
 
@@ -92,6 +101,7 @@ object TransactionDataBatchProducer {
   def filterTxs(transactions: Dataset[Transaction], fromInstant: Instant, untilInstant: Instant)
   : Dataset[Transaction] = {
     import transactions.sparkSession.implicits._
+    println(s"filtering ${transactions.count()} from $fromInstant until $untilInstant")
     transactions.filter(
       ($"date" >= lit(fromInstant.getEpochSecond).cast(TimestampType)) &&
         ($"date" < lit(untilInstant.getEpochSecond).cast(TimestampType)))

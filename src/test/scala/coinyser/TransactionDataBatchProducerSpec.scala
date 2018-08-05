@@ -137,22 +137,26 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
           tuple1 <- TransactionDataBatchProducer.processOneBatch(
             IO(txs1.toDS()),
             txs0.toDS(),
+            Instant.parse("2018-08-02T06:23:00Z"),
             Instant.parse("2018-08-02T06:23:26Z"))
 
           tuple2 <- TransactionDataBatchProducer.processOneBatch(
             IO(txs2.toDS()),
             tuple1._1,
+            TransactionDataBatchProducer.truncateInstant(tuple1._2, 1.minute),
             tuple1._2)
 
           tuple3 <- TransactionDataBatchProducer.processOneBatch(
             IO(txs3.toDS()),
             tuple2._1,
+            TransactionDataBatchProducer.truncateInstant(tuple2._2, 1.minute),
             tuple2._2)
         } yield (tuple1, tuple2, tuple3)
       }.unsafeRunSync()
 
       val savedTransactions = spark.read.parquet(appConfig.transactionStorePath).as[Transaction].collect()
       savedTransactions.map(_.tid).toSet should ===(expectedTxs.map(_.tid).toSet)
+      // TODO check tuple1, tuple2, tuple3
     }
 
 

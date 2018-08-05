@@ -31,7 +31,7 @@ object TransactionDataBatchProducerApp extends App {
   implicit val appContext: AppContext = new AppContext()
 
   val initialJsonTxs = IO {
-    Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=minute")).mkString
+    Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=day")).mkString
   }
 
   val nextJsonTxs = IO {

@@ -28,23 +28,31 @@ object TransactionDataBatchProducer {
     import appContext._
 
     for {
-      prevTxs <- readTransactions(initialJsonTxs)
-      prevEndInstant <- currentInstant
-      _ <- Monad[IO].tailRecM((prevTxs, prevEndInstant)) {
-        case (txs, instant) => processOneBatch(readTransactions(jsonTxs), txs, instant).map(_.asLeft)
+      firstTxs <- readTransactions(initialJsonTxs)
+      firstEnd <- currentInstant
+      firstStart = truncateInstant(firstEnd, 1.day) // TODO parameterize firstInterval
+      _ <- Monad[IO].tailRecM((firstTxs, firstStart, firstEnd)) {
+        case (txs, start, instant) =>
+          processOneBatch(readTransactions(jsonTxs), txs, start, instant).map {
+            case (nextTransactions, nextEnd) =>
+              val nextStart = truncateInstant(nextEnd, config.intervalBetweenReads)
+              Left((nextTransactions, nextStart, nextEnd))
+          }
       }
     } yield ()
   }
 
-  def processOneBatch(lastTransactionsIO: IO[Dataset[Transaction]], previousTransactions: Dataset[Transaction], previousEnd: Instant)(implicit appCtx: AppContext): IO[(Dataset[Transaction], Instant)] = {
+  // TODO return nextStart, will simplify testing
+  def processOneBatch(lastTransactionsIO: IO[Dataset[Transaction]],
+                      previousTransactions: Dataset[Transaction],
+                      start: Instant, previousEnd: Instant)(implicit appCtx: AppContext)
+  : IO[(Dataset[Transaction], Instant)] = {
     import appCtx._
     import spark.implicits._
 
     for {
       _ <- IO.sleep(config.intervalBetweenReads - MaxReadTime)
 
-      // TODO pass start as argument so that we can truncate to the start of day
-      start = truncateInstant(previousEnd, config.intervalBetweenReads)
       beforeRead <- currentInstant
       // We are sure that lastTransactions contain all transactions until lastEnd
       lastEnd = beforeRead.minusSeconds(ApiLag.toSeconds)

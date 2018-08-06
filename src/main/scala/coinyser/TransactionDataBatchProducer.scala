@@ -30,23 +30,19 @@ object TransactionDataBatchProducer {
     for {
       firstTxs <- readTransactions(initialJsonTxs)
       firstEnd <- currentInstant
-      firstStart = truncateInstant(firstEnd, 1.day) // TODO parameterize firstInterval
+      firstStart = truncateInstant(firstEnd, config.firstInterval)
       _ <- Monad[IO].tailRecM((firstTxs, firstStart, firstEnd)) {
         case (txs, start, instant) =>
-          processOneBatch(readTransactions(jsonTxs), txs, start, instant).map {
-            case (nextTransactions, nextEnd) =>
-              val nextStart = truncateInstant(nextEnd, config.intervalBetweenReads)
-              Left((nextTransactions, nextStart, nextEnd))
-          }
+          processOneBatch(readTransactions(jsonTxs), txs, start, instant).map(_.asLeft)
       }
     } yield ()
   }
 
-  // TODO return nextStart, will simplify testing
   def processOneBatch(lastTransactionsIO: IO[Dataset[Transaction]],
                       previousTransactions: Dataset[Transaction],
-                      start: Instant, previousEnd: Instant)(implicit appCtx: AppContext)
-  : IO[(Dataset[Transaction], Instant)] = {
+                      batchStart: Instant,
+                      previousEnd: Instant)(implicit appCtx: AppContext)
+  : IO[(Dataset[Transaction], Instant, Instant)] = {
     import appCtx._
     import spark.implicits._
 
@@ -55,29 +51,29 @@ object TransactionDataBatchProducer {
 
       beforeRead <- currentInstant
       // We are sure that lastTransactions contain all transactions until lastEnd
-      lastEnd = beforeRead.minusSeconds(ApiLag.toSeconds)
+      end = beforeRead.minusSeconds(ApiLag.toSeconds)
       lastTransactions <- lastTransactionsIO
-      end = truncateInstant(lastEnd, config.intervalBetweenReads)
+      batchEnd = truncateInstant(end, config.intervalBetweenReads)
       _ <- IO {
-        println("start      : " + start)
         println("previousEnd: " + previousEnd)
-        println("lastEnd    : " + lastEnd)
-        println("beforeRead : " + beforeRead)
         println("end        : " + end)
+        println("beforeRead : " + beforeRead)
+        println("batchStart      : " + batchStart)
+        println("batchEnd        : " + batchEnd)
         println(lastTransactions.map(_.tid).collect().toSet)
       }
       transactions <-
-        if (start == end) {
+        if (batchStart == batchEnd) {
           IO.pure((previousTransactions union lastTransactions).distinct())
         }
         else {
-          require(previousEnd.getEpochSecond < end.getEpochSecond)
-          val firstTxs = filterTxs(previousTransactions, start, previousEnd)
-          val tailTxs = filterTxs(lastTransactions, previousEnd, end)
-          TransactionDataBatchProducer.save(firstTxs union tailTxs, start).map(_ => lastTransactions)
+          require(previousEnd.getEpochSecond < batchEnd.getEpochSecond)
+          val firstTxs = filterTxs(previousTransactions, batchStart, previousEnd)
+          val tailTxs = filterTxs(lastTransactions, previousEnd, batchEnd)
+          TransactionDataBatchProducer.save(firstTxs union tailTxs, batchStart).map(_ => lastTransactions)
         }
 
-    } yield (transactions, lastEnd)
+    } yield (transactions, batchEnd, end)
   }
 
 

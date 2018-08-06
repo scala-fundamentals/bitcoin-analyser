@@ -46,6 +46,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
     bootstrapServers = "localhost:9092",
     checkpointLocation = checkpointDir.toString,
     transactionStorePath = transactionStoreDir.toString,
+    firstInterval = 1.day,
     intervalBetweenReads = 1.minute
   )
 
@@ -92,6 +93,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
   "TransactionDataBatchProducer.processOneBatch" should {
     "Wait a bit of time, fetch the next batch of transactions, and save a filtered union of the previous and the last batch" in {
       // TODO timezone
+      // TODO use fewer transaction to make it more concise
       val transactions = Seq(
         "|2018-08-02 07:22:34|71319732|7657.58|true |0.021762  |",
         "|2018-08-02 07:22:47|71319735|7663.85|false|0.01385517|",
@@ -125,44 +127,57 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
         "|2018-08-02 07:26:19|71319802|7663.86|false|0.12409542|"
       ).map(parseTransaction)
 
+      // TODO use >= <= in filter to make it more concise
       val txs0 = transactions.filter(tx => Set(71319739, 71319738, 71319735, 71319732).contains(tx.tid))
       val txs1 = transactions.filter(tx => Set(71319760, 71319751, 71319752, 71319755, 71319761, 71319754, 71319758, 71319753).contains(tx.tid))
       val txs2 = transactions.filter(tx => Set(71319773, 71319779, 71319776, 71319780, 71319775, 71319774).contains(tx.tid))
       val txs3 = transactions.filter(tx => Set(71319783, 71319784, 71319793, 71319794, 71319785, 71319782, 71319795, 71319789).contains(tx.tid))
       val expectedTxs = transactions.filter(tx => Set(71319738, 71319739, 71319751, 71319752, 71319753, 71319754, 71319755, 71319758, 71319760, 71319761, 71319773, 71319774, 71319775, 71319776, 71319779, 71319780).contains(tx.tid))
 
-      FakeTimer.clockRealTimeInMillis = Instant.parse("2018-08-02T06:23:32Z").toEpochMilli
-      val ((ds1, instant1), (ds2, instant2), (ds3, instant3)) = {
+      val initialClock = Instant.parse("2018-08-02T06:23:32Z").toEpochMilli
+      FakeTimer.clockRealTimeInMillis = initialClock
+      val threeBatchesIO =
         for {
           tuple1 <- TransactionDataBatchProducer.processOneBatch(
             IO(txs1.toDS()),
             txs0.toDS(),
             Instant.parse("2018-08-02T06:23:00Z"),
             Instant.parse("2018-08-02T06:23:26Z"))
+          (ds1, start1, end1) = tuple1
+          _ <- IO {
+            ds1.collect() should contain theSameElementsAs txs1
+            start1 should ===(Instant.parse("2018-08-02T06:24:00Z"))
+            end1 should ===(Instant.parse("2018-08-02T06:24:12Z")) // initialClock + 1mn - 15s - 5s
+          }
 
           tuple2 <- TransactionDataBatchProducer.processOneBatch(
-            IO(txs2.toDS()),
-            tuple1._1,
-            TransactionDataBatchProducer.truncateInstant(tuple1._2, 1.minute),
-            tuple1._2)
+            IO(txs2.toDS()), ds1, start1, end1)
+          (ds2, start2, end2) = tuple2
+          _ <- IO {
+            ds2.collect() should contain theSameElementsAs (txs1 union txs2)
+            start2 should ===(Instant.parse("2018-08-02T06:24:00Z"))
+            end2 should ===(Instant.parse("2018-08-02T06:24:57Z")) // initialClock + 1mn -15s + 1mn -15s -5s = end1 + 45s
+          }
 
           tuple3 <- TransactionDataBatchProducer.processOneBatch(
-            IO(txs3.toDS()),
-            tuple2._1,
-            TransactionDataBatchProducer.truncateInstant(tuple2._2, 1.minute),
-            tuple2._2)
-        } yield (tuple1, tuple2, tuple3)
-      }.unsafeRunSync()
+            IO(txs3.toDS()), ds2, start2, end2)
+          (ds3, start3, end3) = tuple3
+          _ <- IO {
+            ds3.collect() should contain theSameElementsAs txs3
+            start3 should ===(Instant.parse("2018-08-02T06:25:00Z"))
+            end3 should ===(Instant.parse("2018-08-02T06:25:42Z"))
+          }
+        } yield ()
 
+      threeBatchesIO.unsafeRunSync()
       val savedTransactions = spark.read.parquet(appConfig.transactionStorePath).as[Transaction].collect()
       savedTransactions.map(_.tid).toSet should ===(expectedTxs.map(_.tid).toSet)
-      // TODO check tuple1, tuple2, tuple3
     }
 
 
     // TODO improve this test to highlight the scenario above
     "TransactionDataBatchProducer.readSaveRepeatedly" should {
-      "fetch new transactions every 10s and save them" in {
+      "fetch new transactions every 10s and save them" ignore {
         def txIO = IO {
           // TODO use IO clock
           val now = OffsetDateTime.now().toEpochSecond

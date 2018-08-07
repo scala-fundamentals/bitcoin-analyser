@@ -36,7 +36,9 @@ class TransactionDataProducerSpec extends WordSpec with Matchers with BeforeAndA
     topic = "transaction_btcusd",
     bootstrapServers = "localhost:9092",
     checkpointLocation = checkpointDir.toString,
-    transactionStorePath = "???"
+    transactionStorePath = "???",
+    firstInterval = ???,
+    intervalBetweenReads = ???
   )
 
   import spark.implicits._

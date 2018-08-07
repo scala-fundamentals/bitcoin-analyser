@@ -18,7 +18,9 @@ object MarketDataProducerApp extends App {
     topic = "ticker_btcusd",
     bootstrapServers = "localhost:9092",
     checkpointLocation = checkpointDir,
-    transactionStorePath = "???"
+    transactionStorePath = "???",
+    firstInterval = ???,
+    intervalBetweenReads = ???
   )
 
 

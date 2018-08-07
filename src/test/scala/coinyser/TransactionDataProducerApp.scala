@@ -18,7 +18,9 @@ object TransactionDataProducerApp extends App {
     topic = "transaction_btcusd",
     bootstrapServers = "localhost:9092",
     checkpointLocation = checkpointDir,
-    transactionStorePath = "???"
+    transactionStorePath = "???",
+    firstInterval = ???,
+    intervalBetweenReads = ???
   )
 
 

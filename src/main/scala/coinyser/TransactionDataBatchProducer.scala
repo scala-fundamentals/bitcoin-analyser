@@ -60,7 +60,7 @@ object TransactionDataBatchProducer {
         println("beforeRead : " + beforeRead)
         println("batchStart      : " + batchStart)
         println("batchEnd        : " + batchEnd)
-        println(lastTransactions.map(_.tid).collect().toSet)
+        //        println(lastTransactions.map(_.tid).collect().toSet)
       }
       transactions <-
         if (batchStart == batchEnd) {

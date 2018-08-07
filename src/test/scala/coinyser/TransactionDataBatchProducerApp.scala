@@ -9,6 +9,7 @@ import scala.concurrent.duration._
 import scala.io.Source
 import scala.concurrent.ExecutionContext.Implicits.global
 
+// TODO use IOApp
 object TransactionDataBatchProducerApp extends App {
   sys.props("user.timezone") = "UTC"
 
@@ -19,7 +20,8 @@ object TransactionDataBatchProducerApp extends App {
     bootstrapServers = "localhost:9092",
     checkpointLocation = checkpointDir,
     transactionStorePath = "/tmp/coinyser/transaction",
-    intervalBetweenReads = 1.minute
+    firstInterval = 1.day,
+    intervalBetweenReads = 1.hour
   )
 
   implicit val spark: SparkSession = SparkSession
@@ -35,7 +37,7 @@ object TransactionDataBatchProducerApp extends App {
   }
 
   val nextJsonTxs = IO {
-    Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=minute")).mkString
+    Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=hour")).mkString
   }
   TransactionDataBatchProducer.processRepeatedly(initialJsonTxs, nextJsonTxs).unsafeRunSync()
 

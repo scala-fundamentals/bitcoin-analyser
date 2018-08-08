@@ -17,6 +17,7 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.4" % "test"
 libraryDependencies += "org.typelevel" %% "cats-core" % "1.1.0"
 libraryDependencies += "org.typelevel" %% "cats-laws" % "1.1.0"
 libraryDependencies += "org.typelevel" %% "cats-effect" % "1.0.0-RC2"
+libraryDependencies += "com.pusher" % "pusher-java-client" % "1.8.0"
 scalacOptions += "-Ypartial-unification"
 
 // Avoids SI-3623

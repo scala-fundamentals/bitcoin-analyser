@@ -11,12 +11,13 @@ import org.apache.spark.sql.{Dataset, SaveMode, SparkSession}
 
 import scala.concurrent.duration._
 import cats.implicits._
+import coinyser.AppConfig
 
 class AppContext(implicit val config: AppConfig,
                  implicit val spark: SparkSession,
                  implicit val timer: Timer[IO])
 
-object TransactionDataBatchProducer {
+object BatchProducer {
   /** Maximum time required to read transactions from the API */
   val MaxReadTime: FiniteDuration = 15.seconds
   /** Number of seconds required by the API to make a transaction visible */
@@ -70,7 +71,7 @@ object TransactionDataBatchProducer {
           require(previousEnd.getEpochSecond < batchEnd.getEpochSecond)
           val firstTxs = filterTxs(previousTransactions, batchStart, previousEnd)
           val tailTxs = filterTxs(lastTransactions, previousEnd, batchEnd)
-          TransactionDataBatchProducer.save(firstTxs union tailTxs, batchStart).map(_ => lastTransactions)
+          BatchProducer.save(firstTxs union tailTxs, batchStart).map(_ => lastTransactions)
         }
 
     } yield (transactions, batchEnd, end)

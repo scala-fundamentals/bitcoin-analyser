@@ -1,7 +1,8 @@
-package coinyser
+package coinyser.draft
 
 import java.net.URL
 
+import coinyser.{AppConfig, BitstampTransaction, Transaction}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.StreamingQuery
 import org.apache.spark.sql.types._
@@ -10,12 +11,7 @@ import org.apache.spark.sql.{Dataset, SparkSession}
 import scala.concurrent.duration.FiniteDuration
 import scala.io.Source
 
-case class AppConfig(topic: String,
-                     bootstrapServers: String,
-                     checkpointLocation: String,
-                     firstInterval: FiniteDuration,
-                     intervalBetweenReads: FiniteDuration,
-                     transactionStorePath: String)
+
 
 
 object TransactionDataProducer {

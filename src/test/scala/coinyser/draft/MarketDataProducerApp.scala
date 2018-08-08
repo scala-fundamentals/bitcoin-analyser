@@ -1,7 +1,8 @@
-package coinyser
+package coinyser.draft
 
 import java.net.URL
 
+import coinyser.AppConfig
 import org.apache.spark.sql.SparkSession
 
 /*

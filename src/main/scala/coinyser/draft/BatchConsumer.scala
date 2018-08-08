@@ -1,15 +1,9 @@
-package coinyser
+package coinyser.draft
 
 import java.net.URL
-import java.sql.Timestamp
 
-import org.apache.kafka.clients.consumer.ConsumerRecord
-import org.apache.kafka.common.serialization.StringDeserializer
-import org.apache.spark.sql.{Dataset, SparkSession}
-import org.apache.spark.sql.catalyst.analysis.UnresolvedStar
-import org.apache.spark.sql.streaming.StreamingQuery
-import org.apache.spark.sql.types.{DataType, StructType}
-import org.apache.spark.streaming.StreamingContext
+import coinyser.{AppConfig, Transaction}
+import org.apache.spark.sql.SparkSession
 
 
 
@@ -23,8 +17,8 @@ object BatchConsumer {
   }
 
   def fromKafka(implicit kafkaConfig: AppConfig, spark: SparkSession): Unit = {
-    import spark.implicits._
     import org.apache.spark.sql.functions._
+    import spark.implicits._
     val schema = Seq.empty[Transaction].toDS().schema
 /*
     val inStream: Dataset[Ticker] = spark.readStream.format("kafka")

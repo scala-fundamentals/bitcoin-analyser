@@ -1,4 +1,4 @@
-package coinyser
+package coinyser.draft
 
 case class TickerJson(high: String,
                       last: String,

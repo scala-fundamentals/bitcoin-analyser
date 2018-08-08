@@ -1,10 +1,10 @@
-package coinyser
+package coinyser.draft
 
 import java.io.File
 import java.nio.file.Files
 import java.sql.Timestamp
 
-import coinyser.TransactionDataProducerSpec._
+import coinyser.{AppConfig, Transaction}
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.streaming.MemoryStream
@@ -15,6 +15,7 @@ import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 
 import scala.concurrent.duration._
 import scala.io.Source
+import TransactionDataProducerSpec.createConstantSource
 
 class TransactionDataProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll with TypeCheckedTripleEquals with Eventually {
 

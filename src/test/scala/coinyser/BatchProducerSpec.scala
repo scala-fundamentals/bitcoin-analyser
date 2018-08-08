@@ -7,7 +7,7 @@ import java.time.{Instant, OffsetDateTime}
 import java.util.concurrent.TimeUnit
 
 import cats.effect.{IO, Timer}
-import coinyser.TransactionDataProducerSpec._
+import coinyser.draft.TransactionDataProducerSpec._
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.streaming.MemoryStream
@@ -19,9 +19,10 @@ import org.scalatest.{BeforeAndAfterAll, EitherValues, Matchers, WordSpec}
 
 import scala.concurrent.duration._
 import scala.io.Source
-import TransactionDataBatchProducerSpec.parseTransaction
+import BatchProducerSpec.parseTransaction
+import coinyser.AppConfig
 
-class TransactionDataBatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll with TypeCheckedTripleEquals with Eventually with EitherValues {
+class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll with TypeCheckedTripleEquals with Eventually with EitherValues {
 
   override implicit def patienceConfig: PatienceConfig = new PatienceConfig(10.seconds, 100.millis)
 
@@ -82,7 +83,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
         """[{"date": "1532365695", "tid": "70683282", "price": "7740.00", "type": "0", "amount": "0.10041719"},
           |{"date": "1532365693", "tid": "70683281", "price": "7739.99", "type": "0", "amount": "0.00148564"}]""".stripMargin)
 
-      val ds: Dataset[Transaction] = TransactionDataBatchProducer.readTransactions(txIO).unsafeRunSync()
+      val ds: Dataset[Transaction] = BatchProducer.readTransactions(txIO).unsafeRunSync()
       val data = ds.collect()
       data should contain theSameElementsAs Seq(transaction1, transaction2)
     }
@@ -138,7 +139,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
       FakeTimer.clockRealTimeInMillis = initialClock
       val threeBatchesIO =
         for {
-          tuple1 <- TransactionDataBatchProducer.processOneBatch(
+          tuple1 <- BatchProducer.processOneBatch(
             IO(txs1.toDS()),
             txs0.toDS(),
             Instant.parse("2018-08-02T06:23:00Z"),
@@ -150,7 +151,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
             end1 should ===(Instant.parse("2018-08-02T06:24:12Z")) // initialClock + 1mn - 15s - 5s
           }
 
-          tuple2 <- TransactionDataBatchProducer.processOneBatch(
+          tuple2 <- BatchProducer.processOneBatch(
             IO(txs2.toDS()), ds1, start1, end1)
           (ds2, start2, end2) = tuple2
           _ <- IO {
@@ -159,7 +160,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
             end2 should ===(Instant.parse("2018-08-02T06:24:57Z")) // initialClock + 1mn -15s + 1mn -15s -5s = end1 + 45s
           }
 
-          tuple3 <- TransactionDataBatchProducer.processOneBatch(
+          tuple3 <- BatchProducer.processOneBatch(
             IO(txs3.toDS()), ds2, start2, end2)
           (ds3, start3, end3) = tuple3
           _ <- IO {
@@ -190,7 +191,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
         val intervalSeconds = 10
         val io = for {
           _ <- IO.shift
-          _ <- TransactionDataBatchProducer.processRepeatedly(txIO, txIO)
+          _ <- BatchProducer.processRepeatedly(txIO, txIO)
         } yield ()
         io.unsafeRunTimed(35.seconds)
 
@@ -212,7 +213,7 @@ class TransactionDataBatchProducerSpec extends WordSpec with Matchers with Befor
 
 }
 
-object TransactionDataBatchProducerSpec {
+object BatchProducerSpec {
   def parseTransaction(s: String): Transaction =
     s.split('|').toList match {
       case _ +: date +: tid +: amount +: sell +: price +: Nil =>

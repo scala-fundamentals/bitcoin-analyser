@@ -1,15 +1,12 @@
-package coinyser
+package coinyser.draft
 
-import java.io.File
 import java.net.URL
-import java.util.Properties
 
-import scala.collection.JavaConversions._
-import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
-import org.apache.spark.sql.{Dataset, Row, SparkSession}
+import coinyser.AppConfig
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.StreamingQuery
 import org.apache.spark.sql.types.{DoubleType, LongType, TimestampType}
+import org.apache.spark.sql.{Dataset, SparkSession}
 
 import scala.io.Source
 

@@ -1,21 +1,21 @@
-package coinyser
+package coinyser.draft
 
 import java.io.File
-import java.nio.file.{Files, Path, Paths}
+import java.nio.file.Files
 import java.sql.Timestamp
-import java.util.concurrent.atomic.AtomicInteger
 
+import coinyser.draft.MarketDataProducerSpec._
+import coinyser.AppConfig
 import org.apache.commons.io.FileUtils
-import org.apache.spark.sql.streaming.{OutputMode, StreamingQueryProgress}
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.streaming.MemoryStream
+import org.apache.spark.sql.streaming.OutputMode
 import org.scalactic.TypeCheckedTripleEquals
 import org.scalatest.concurrent.Eventually
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpec}
 
 import scala.concurrent.duration._
 import scala.io.Source
-import MarketDataProducerSpec._
 
 class MarketDataProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll with TypeCheckedTripleEquals with Eventually {
 

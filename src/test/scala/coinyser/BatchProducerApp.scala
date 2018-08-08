@@ -3,6 +3,7 @@ package coinyser
 import java.net.URL
 
 import cats.effect.IO
+import coinyser.AppConfig
 import org.apache.spark.sql.SparkSession
 
 import scala.concurrent.duration._
@@ -10,7 +11,7 @@ import scala.io.Source
 import scala.concurrent.ExecutionContext.Implicits.global
 
 // TODO use IOApp
-object TransactionDataBatchProducerApp extends App {
+object BatchProducerApp extends App {
   sys.props("user.timezone") = "UTC"
 
   // In prod, should be a distributed filesystem
@@ -19,7 +20,7 @@ object TransactionDataBatchProducerApp extends App {
     topic = "transaction_btcusd",
     bootstrapServers = "localhost:9092",
     checkpointLocation = checkpointDir,
-    transactionStorePath = "/tmp/coinyser/transaction",
+    transactionStorePath = "/home/mikael/projects/scala-fundamentals/bitcoin-analyser/data/transactions/currency_pair=btcusd",
     firstInterval = 1.day,
     intervalBetweenReads = 1.hour
   )
@@ -39,7 +40,7 @@ object TransactionDataBatchProducerApp extends App {
   val nextJsonTxs = IO {
     Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=hour")).mkString
   }
-  TransactionDataBatchProducer.processRepeatedly(initialJsonTxs, nextJsonTxs).unsafeRunSync()
+  BatchProducer.processRepeatedly(initialJsonTxs, nextJsonTxs).unsafeRunSync()
 
   // TODO in Zeppelin:
   // val ds = spark.read.parquet("/tmp/coinyser/transaction/2018-07-26")

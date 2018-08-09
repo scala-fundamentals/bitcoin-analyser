@@ -2,7 +2,7 @@ package coinyser.draft
 
 import java.net.URL
 
-import coinyser.{AppConfig, BitstampTransaction, Transaction}
+import coinyser.{AppConfig, HttpTransaction, Transaction}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.streaming.StreamingQuery
 import org.apache.spark.sql.types._
@@ -49,7 +49,7 @@ object TransactionDataProducer {
 
   def transactionReadStream(createSource: Long => Source)(implicit spark: SparkSession): Dataset[Transaction] = {
     import spark.implicits._
-    val txSchema = Seq.empty[BitstampTransaction].toDS().schema
+    val txSchema = Seq.empty[HttpTransaction].toDS().schema
     val schema = ArrayType(txSchema)
     spark.readStream
       .format("rate")

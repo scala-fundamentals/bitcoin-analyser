@@ -89,7 +89,7 @@ object BatchProducer {
 
   def readTransactions(jsonTxs: IO[String])(implicit spark: SparkSession): IO[Dataset[Transaction]] = {
     import spark.implicits._
-    val txSchema = Seq.empty[BitstampTransaction].toDS().schema
+    val txSchema = Seq.empty[HttpTransaction].toDS().schema
     val schema = ArrayType(txSchema)
     jsonTxs.map(json =>
       Seq(json).toDS()

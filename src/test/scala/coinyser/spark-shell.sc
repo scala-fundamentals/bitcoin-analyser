@@ -15,7 +15,9 @@ def filterTxs(txs: Dataset[Transaction]): Dataset[Transaction] = txs.filter("dat
 val ds2 = filterTxs(BatchProducer.readTransactions(IO(Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=day")).mkString)).unsafeRunSync())
 val grp2 = ds2.groupBy(window($"date", "1 minute").as("w2")).agg(count($"tid").as("cnt2"))
 
-val ds = filterTxs(spark.read.parquet("/tmp/coinyser/transaction/dt=2018-08-03").as[Transaction])
+val ds = filterTxs(spark.read.parquet("/home/mikael/projects/scala-fundamentals/bitcoin-analyser/data/transactions/currency_pair=btcusd/dt=2018-08-10").as[Transaction])
 val grp1 = ds.groupBy(window($"date", "1 minute").as("w1")).agg(count($"tid").as("cnt1"))
 grp1.join(grp2, $"w1" === $"w2", "full_outer").sort($"w1").filter("cnt1 != cnt2").show(1000, false)
 
+val schema = Seq.empty[Transaction].toDS().schema
+val dsStream = spark.read.format("kafka").option("kafka.bootstrap.servers", "localhost:9092").option("subscribe", "transactions_draft1").load().select(from_json(col("value").cast("string"), schema).alias("v")).select("v.*").as[Transaction]

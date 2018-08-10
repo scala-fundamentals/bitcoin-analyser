@@ -34,27 +34,11 @@ object KafkaProducerApp extends App {
 
   val producer = new KafkaProducer[String, String](props.mapValues(_.asInstanceOf[AnyRef]))
 
-  lazy val pusher = new Pusher("de504dc5763aeef9ff52")
+  val pusher = new Pusher("de504dc5763aeef9ff52")
+  KafkaProducer.start(pusher, producer).unsafeRunSync()
+  println("started")
 
-  pusher.connect(new ConnectionEventListener {
-    def onConnectionStateChange(change: ConnectionStateChange): Unit = {
-      println("State changed to " + change.getCurrentState + " from " + change.getPreviousState)
-    }
-
-    def onError(message: String, code: String, e: Exception): Unit = {
-      println("There was a problem connecting!")
-    }
-  }, ConnectionState.ALL)
-
-  val channel = pusher.subscribe("live_trades")
-  channel.bind("trade", new SubscriptionEventListener() {
-    override def onEvent(channel: String, event: String, data: String): Unit = {
-      println(s"Received event: $event with data: $data")
-      producer.send(new ProducerRecord[String, String]("transactions_draft0", data))
-    }
-  })
-
-  Thread.sleep(100000)
+  Thread.sleep(1000000)
 }
 
 object StreamingProducerApp extends App {

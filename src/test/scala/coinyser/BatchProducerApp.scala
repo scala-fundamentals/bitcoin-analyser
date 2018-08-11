@@ -12,7 +12,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 // TODO use IOApp
 object BatchProducerApp extends App {
-  sys.props("user.timezone") = "UTC"
 
   // In prod, should be a distributed filesystem
   val checkpointDir = "/tmp/coinyser/TransactionDataProducerApp"

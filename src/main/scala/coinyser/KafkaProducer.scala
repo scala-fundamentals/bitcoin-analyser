@@ -1,10 +1,11 @@
 package coinyser
 
 import java.sql.Timestamp
+import java.text.SimpleDateFormat
 
 import cats.effect.IO
 import com.fasterxml.jackson.core.JsonParser
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.{ObjectMapper, SerializationFeature}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.pusher.client.{Client, Pusher}
 import com.pusher.client.channel.SubscriptionEventListener
@@ -22,6 +23,9 @@ object KafkaProducer {
 
   val mapper = new ObjectMapper()
   mapper.registerModule(DefaultScalaModule)
+  mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+  mapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"))
+  // can use sdf.setTimeZone(TimeZone.getTimeZone("UTC")), but not required: the time is in local time, but is also parsed in local time is spark
 
   def deserializeWebsocketTransaction(s: String): WebsocketTransaction = {
     mapper.readValue(s, classOf[WebsocketTransaction])

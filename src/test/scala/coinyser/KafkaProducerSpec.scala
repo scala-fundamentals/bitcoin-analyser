@@ -34,7 +34,7 @@ class KafkaProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
 
   "KafkaProducer.convertTransaction" should {
     "convert a WebSocketTransaction to a Transaction" in {
-      KafkaProducer.convertTransaction(websocketTransaction) should ===(transaction)
+      KafkaProducer.convertWsTransaction(websocketTransaction) should ===(transaction)
     }
   }
 
@@ -44,6 +44,9 @@ class KafkaProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
         """{"date":1533797395000,"tid":71826763,"price":6339.73,"sell":false,"amount":0.04531827}""")
     }
   }
+
+
+  // TODO test Spark from_json to_json in a KafkaConsumer: there is a * 1000 somewhere
 
 
 }

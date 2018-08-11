@@ -12,7 +12,7 @@ import com.pusher.client.connection.{ConnectionEventListener, ConnectionState, C
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 
 object KafkaProducer {
-  def convertTransaction(wsTx: WebsocketTransaction): Transaction =
+  def convertWsTransaction(wsTx: WebsocketTransaction): Transaction =
     Transaction(
       date = new Timestamp(wsTx.timestamp.toLong * 1000),
       tid = wsTx.id,
@@ -48,7 +48,7 @@ object KafkaProducer {
 
   def start(pusher: Client, kafkaProducer: KafkaProducer[String, String]): IO[Unit] =
     subscribe(pusher) { wsTx =>
-      val tx = serializeTransaction(convertTransaction(deserializeWebsocketTransaction(wsTx)))
+      val tx = serializeTransaction(convertWsTransaction(deserializeWebsocketTransaction(wsTx)))
       // TODO pass topic in a context object
       kafkaProducer.send(new ProducerRecord[String, String]("transactions_draft1", tx))
     }

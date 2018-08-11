@@ -2,6 +2,7 @@ package coinyser
 
 import java.util.Properties
 
+import coinyser.draft.BitstampReceiver
 import com.pusher.client.Pusher
 import com.pusher.client.connection.ConnectionEventListener
 import org.apache.spark.storage.StorageLevel
@@ -16,9 +17,11 @@ import scala.concurrent.duration._
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.Producer
 import org.apache.kafka.clients.producer.ProducerRecord
+
 import scala.collection.JavaConversions._
 
 // Use log compaction to ensure high availability ? (2 producers running concurrently)
+// TODO use IOApp
 object KafkaProducerApp extends App {
 
 
@@ -41,49 +44,6 @@ object KafkaProducerApp extends App {
   Thread.sleep(1000000)
 }
 
-object StreamingProducerApp extends App {
-
-  implicit val spark: SparkSession = SparkSession
-    .builder
-    .master("local[*]")
-    .appName("StreamingProducer")
-    .getOrCreate()
-
-  val ssc = new StreamingContext(spark.sparkContext, Seconds(5))
-  val stream = ssc.receiverStream(new BitstampReceiver())
-  stream.print()
-  ssc.start()
-  ssc.awaitTermination()
-}
-
-class BitstampReceiver extends Receiver[String](StorageLevel.MEMORY_ONLY) {
-  @transient
-  lazy val pusher = new Pusher("de504dc5763aeef9ff52")
-
-  def onStart(): Unit = {
-    pusher.connect(new ConnectionEventListener {
-      def onConnectionStateChange(change: ConnectionStateChange): Unit = {
-        println("State changed to " + change.getCurrentState + " from " + change.getPreviousState)
-      }
-
-      def onError(message: String, code: String, e: Exception): Unit = {
-        println("There was a problem connecting!")
-      }
-    }, ConnectionState.ALL)
-
-    val channel = pusher.subscribe("live_trades")
-    channel.bind("trade", new SubscriptionEventListener() {
-      override def onEvent(channel: String, event: String, data: String): Unit = {
-        store(data)
-      }
-    })
-
-  }
-
-  def onStop(): Unit = {
-    pusher.disconnect()
-    pusher.unsubscribe("live_trades")
-  }
 
 
-}
+

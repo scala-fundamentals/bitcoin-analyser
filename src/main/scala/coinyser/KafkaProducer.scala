@@ -2,6 +2,7 @@ package coinyser
 
 import java.sql.Timestamp
 import java.text.SimpleDateFormat
+import java.util.TimeZone
 
 import cats.effect.IO
 import com.fasterxml.jackson.core.JsonParser
@@ -21,11 +22,17 @@ object KafkaProducer {
       sell = wsTx.`type` == 1,
       amount = wsTx.amount)
 
-  val mapper = new ObjectMapper()
-  mapper.registerModule(DefaultScalaModule)
-  mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-  mapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"))
-  // can use sdf.setTimeZone(TimeZone.getTimeZone("UTC")), but not required: the time is in local time, but is also parsed in local time is spark
+  val mapper: ObjectMapper = {
+    val m = new ObjectMapper()
+    m.registerModule(DefaultScalaModule)
+    // Issue with Spark reading seconds, TODO create a StackOverflow thread
+    m.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+    val sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    // Very important: the storage must be in UTC
+    sdf.setTimeZone(TimeZone.getTimeZone("UTC"))
+    m.setDateFormat(sdf)
+    m
+  }
 
   def deserializeWebsocketTransaction(s: String): WebsocketTransaction = {
     mapper.readValue(s, classOf[WebsocketTransaction])
@@ -54,7 +61,7 @@ object KafkaProducer {
     subscribe(pusher) { wsTx =>
       val tx = serializeTransaction(convertWsTransaction(deserializeWebsocketTransaction(wsTx)))
       // TODO pass topic in a context object
-      kafkaProducer.send(new ProducerRecord[String, String]("transactions_draft1", tx))
+      kafkaProducer.send(new ProducerRecord[String, String]("transactions_draft3", tx))
     }
 
 

@@ -41,7 +41,7 @@ object KafkaProducerApp extends App {
   KafkaProducer.start(pusher, producer).unsafeRunSync()
   println("started")
 
-  Thread.sleep(1000000)
+  Thread.sleep(10000000)
 }
 
 

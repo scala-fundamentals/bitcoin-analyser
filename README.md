@@ -7,4 +7,12 @@ cd /opt/zeppelin-0.8.0-bin-all/conf
 mv zeppelin-env.sh.template zeppelin-env.sh
 vi zeppelin-env.sh
 export SPARK_HOME=/opt/spark-2.3.1-bin-hadoop2.7
+
+cd /opt/spark-2.3.1-bin-hadoop2.7/jars
+wget http://central.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.11/2.3.1/spark-sql-kafka-0-10_2.11-2.3.1.jar
+wget http://central.maven.org/maven2/org/apache/kafka/kafka-clients/0.10.0.1/kafka-clients-0.10.0.1.jar
+
 ```
+
+## Kafka
+

@@ -1,5 +1,7 @@
 package coinyser
 
+import java.util.TimeZone
+
 import coinyser.KafkaProducerSpec.SampleJsonTransaction
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalactic.TypeCheckedTripleEquals
@@ -7,6 +9,7 @@ import org.scalatest.{BeforeAndAfterAll, EitherValues, Matchers, WordSpec}
 import org.scalatest.concurrent.Eventually
 
 class StreamingConsumerSpec extends WordSpec with Matchers with BeforeAndAfterAll with TypeCheckedTripleEquals with Eventually with EitherValues {
+  TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
 
   implicit val spark: SparkSession = SparkSession
     .builder

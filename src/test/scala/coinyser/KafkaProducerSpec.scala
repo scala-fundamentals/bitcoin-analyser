@@ -28,7 +28,9 @@ class KafkaProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
     }
   }
 
-  // TODO test Spark from_json to_json in a KafkaConsumer: there is a * 1000 somewhere
+  // TODO test subscribe with a mocked pusher
+
+  // TODO use EmbeddedKafka to test the production / consumption ?
 }
 
 object KafkaProducerSpec {
@@ -50,6 +52,6 @@ object KafkaProducerSpec {
     sell = false,
     amount = 0.04531827)
 
-  val SampleJsonTransaction = """{"date":"2018-08-09 07:49:55","tid":71826763,"price":6339.73,"sell":false,"amount":0.04531827}"""
+  val SampleJsonTransaction = """{"date":"2018-08-09 06:49:55","tid":71826763,"price":6339.73,"sell":false,"amount":0.04531827}"""
 
 }

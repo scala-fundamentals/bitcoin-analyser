@@ -22,26 +22,14 @@ import scala.collection.JavaConversions._
 
 // Use log compaction to ensure high availability ? (2 producers running concurrently)
 // TODO use IOApp
-object KafkaProducerApp extends App {
-
-
-  val props = Map(
-    ("bootstrap.servers", "localhost:9092"),
-    ("acks", "all"),
-    ("retries", 0),
-    ("batch.size", 16384),
-    ("linger.ms", 1),
-    ("buffer.memory", 33554432),
-    ("key.serializer", "org.apache.kafka.common.serialization.StringSerializer"),
-    ("value.serializer", "org.apache.kafka.common.serialization.StringSerializer"))
-
-  val producer = new KafkaProducer[String, String](props.mapValues(_.asInstanceOf[AnyRef]))
+object StreamingProducerApp extends App {
+  val config = KafkaConfig("localhost:9092", "transactions_draft3")
 
   val pusher = new Pusher("de504dc5763aeef9ff52")
-  KafkaProducer.start(pusher, producer).unsafeRunSync()
-  println("started")
+  StreamingProducer.start(pusher, config).unsafeRunSync()
 
-  Thread.sleep(10000000)
+  // TODO is there an IO solution for that ?
+  Thread.sleep(Long.MaxValue)
 }
 
 

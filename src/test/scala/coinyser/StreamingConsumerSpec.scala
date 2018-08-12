@@ -2,7 +2,7 @@ package coinyser
 
 import java.util.TimeZone
 
-import coinyser.KafkaProducerSpec.SampleJsonTransaction
+import coinyser.StreamingProducerSpec.SampleJsonTransaction
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.scalactic.TypeCheckedTripleEquals
 import org.scalatest.{BeforeAndAfterAll, EitherValues, Matchers, WordSpec}
@@ -23,11 +23,13 @@ class StreamingConsumerSpec extends WordSpec with Matchers with BeforeAndAfterAl
     "convert a DataFrame of Json values to a Dataset[Transaction]" in {
       val df = Seq(SampleJsonTransaction).toDF("value")
       val ds: Dataset[Transaction] = StreamingConsumer.fromJson(df)
-      ds.collect().toSeq should === (Seq(KafkaProducerSpec.SampleTransaction))
+      ds.collect().toSeq should === (Seq(StreamingProducerSpec.SampleTransaction))
 
 
     }
 
   }
+
+  // TODO test transactionStream
 
 }

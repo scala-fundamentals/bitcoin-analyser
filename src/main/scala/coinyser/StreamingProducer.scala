@@ -13,7 +13,7 @@ import com.pusher.client.channel.SubscriptionEventListener
 import com.pusher.client.connection.{ConnectionEventListener, ConnectionState, ConnectionStateChange}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 
-object KafkaProducer {
+object StreamingProducer {
   def convertWsTransaction(wsTx: WebsocketTransaction): Transaction =
     Transaction(
       date = new Timestamp(wsTx.timestamp.toLong * 1000),
@@ -57,12 +57,25 @@ object KafkaProducer {
     } yield ()
 
 
-  def start(pusher: Client, kafkaProducer: KafkaProducer[String, String]): IO[Unit] =
+  def start(pusher: Client, config: KafkaConfig): IO[Unit] = {
+    val props = Map(
+      ("bootstrap.servers", "localhost:9092"),
+      ("key.serializer", "org.apache.kafka.common.serialization.StringSerializer"),
+      ("value.serializer", "org.apache.kafka.common.serialization.StringSerializer"))
+    // TODO are these properties necessary ?
+    /*    ("acks", "all"),
+        ("retries", 0),
+        ("batch.size", 16384),
+        ("linger.ms", 1),
+        ("buffer.memory", 33554432),
+        */
+    import scala.collection.JavaConversions._
+    val kafkaProducer = new KafkaProducer[String, String](props.mapValues(_.asInstanceOf[AnyRef]))
+
     subscribe(pusher) { wsTx =>
       val tx = serializeTransaction(convertWsTransaction(deserializeWebsocketTransaction(wsTx)))
       // TODO pass topic in a context object
-      kafkaProducer.send(new ProducerRecord[String, String]("transactions_draft3", tx))
+      kafkaProducer.send(new ProducerRecord[String, String](config.transactionsTopic, tx))
     }
-
-
+  }
 }

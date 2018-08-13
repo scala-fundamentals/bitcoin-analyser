@@ -45,8 +45,8 @@ class TransactionDataProducerSpec extends WordSpec with Matchers with BeforeAndA
   import spark.implicits._
 
 
-  val transaction1 = Transaction(date = new Timestamp(1532365695000L), tid = 70683282, price = 7740.00, sell = false, amount = 0.10041719)
-  val transaction2 = Transaction(date = new Timestamp(1532365693000L), tid = 70683281, price = 7739.99, sell = false, amount = 0.00148564)
+  val transaction1 = Transaction(timestamp = new Timestamp(1532365695000L), tid = 70683282, price = 7740.00, sell = false, amount = 0.10041719)
+  val transaction2 = Transaction(timestamp = new Timestamp(1532365693000L), tid = 70683281, price = 7739.99, sell = false, amount = 0.00148564)
 
   "TransactionDataProducer.tickerReadStream" should {
     "create a stream of Transaction data from a constant Source with unique values" in {

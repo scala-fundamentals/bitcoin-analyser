@@ -1,6 +1,7 @@
 package coinyser
 
 import java.sql.Timestamp
+import java.time.ZoneOffset
 
 case class HttpTransaction(date: String,
                            tid: String,
@@ -19,8 +20,27 @@ case class WebsocketTransaction(amount: Double,
                                 id: Int)
 
 
-case class Transaction(date: Timestamp,
+case class Transaction(timestamp: Timestamp,
+                       date: String,
                        tid: Int,
                        price: Double,
                        sell: Boolean,
-                       amount: Double)
+                       amount: Double) {
+}
+
+object Transaction {
+  // Use a second constructor so that Spark can use date as a column
+  def apply(timestamp: Timestamp,
+            tid: Int,
+            price: Double,
+            sell: Boolean,
+            amount: Double) =
+    new Transaction(
+      timestamp = timestamp,
+      date = timestamp.toLocalDateTime.atOffset(ZoneOffset.UTC).toLocalDate.toString,
+      tid = tid,
+      price = price,
+      sell = sell,
+      amount = amount)
+
+}

@@ -16,7 +16,7 @@ import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 object StreamingProducer {
   def convertWsTransaction(wsTx: WebsocketTransaction): Transaction =
     Transaction(
-      date = new Timestamp(wsTx.timestamp.toLong * 1000),
+      timestamp = new Timestamp(wsTx.timestamp.toLong * 1000),
       tid = wsTx.id,
       price = wsTx.price,
       sell = wsTx.`type` == 1,

@@ -20,17 +20,16 @@ import org.scalatest.{BeforeAndAfterAll, EitherValues, Matchers, WordSpec}
 import scala.concurrent.duration._
 import scala.io.Source
 import BatchProducerSpec.parseTransaction
-import coinyser.AppConfig
 
 class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll with TypeCheckedTripleEquals with Eventually with EitherValues {
 
-  override implicit def patienceConfig: PatienceConfig = new PatienceConfig(10.seconds, 100.millis)
+  override implicit def patienceConfig: PatienceConfig = PatienceConfig(10.seconds, 100.millis)
 
 
   implicit val spark: SparkSession = SparkSession
     .builder
     .master("local[*]")
-    .appName("coinyser")
+    .appName("BatchProducerSpec")
     .getOrCreate()
 
   val checkpointDir: File = Files.createTempDirectory("TransactionDataProducerSpec_checkpoint").toFile
@@ -73,8 +72,8 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
   import spark.implicits._
 
 
-  val transaction1 = Transaction(date = new Timestamp(1532365695000L), tid = 70683282, price = 7740.00, sell = false, amount = 0.10041719)
-  val transaction2 = Transaction(date = new Timestamp(1532365693000L), tid = 70683281, price = 7739.99, sell = false, amount = 0.00148564)
+  val transaction1 = Transaction(timestamp = new Timestamp(1532365695000L), tid = 70683282, price = 7740.00, sell = false, amount = 0.10041719)
+  val transaction2 = Transaction(timestamp = new Timestamp(1532365693000L), tid = 70683281, price = 7739.99, sell = false, amount = 0.00148564)
 
   "TransactionDataBatchProducer.readTransactions" should {
     "create a Dataset[Transaction] from a Json String" in {

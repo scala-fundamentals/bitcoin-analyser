@@ -56,6 +56,7 @@ object BatchProducer {
       lastTransactions <- lastTransactionsIO
       batchEnd = truncateInstant(end, config.intervalBetweenReads)
       _ <- IO {
+        // TODO use logger
         println("previousEnd: " + previousEnd)
         println("end        : " + end)
         println("beforeRead : " + beforeRead)
@@ -71,7 +72,7 @@ object BatchProducer {
           require(previousEnd.getEpochSecond < batchEnd.getEpochSecond)
           val firstTxs = filterTxs(previousTransactions, batchStart, previousEnd)
           val tailTxs = filterTxs(lastTransactions, previousEnd, batchEnd)
-          BatchProducer.save(firstTxs union tailTxs, batchStart).map(_ => lastTransactions)
+          BatchProducer.save(firstTxs union tailTxs).map(_ => lastTransactions)
         }
 
     } yield (transactions, batchEnd, end)
@@ -95,7 +96,8 @@ object BatchProducer {
       Seq(json).toDS()
         .select(explode(from_json($"value".cast(StringType), schema)).alias("v"))
         .select(
-          $"v.date".cast(LongType).cast(TimestampType).as("date"),
+          $"v.date".cast(LongType).cast(TimestampType).as("timestamp"),
+          $"v.date".cast(LongType).cast(TimestampType).cast(DateType).as("date"),
           $"v.tid".cast(IntegerType),
           $"v.price".cast(DoubleType),
           $"v.type".cast(BooleanType).as("sell"),
@@ -107,21 +109,22 @@ object BatchProducer {
   : Dataset[Transaction] = {
     import transactions.sparkSession.implicits._
     val filtered = transactions.filter(
-      ($"date" >= lit(fromInstant.getEpochSecond).cast(TimestampType)) &&
-        ($"date" < lit(untilInstant.getEpochSecond).cast(TimestampType)))
+      ($"timestamp" >= lit(fromInstant.getEpochSecond).cast(TimestampType)) &&
+        ($"timestamp" < lit(untilInstant.getEpochSecond).cast(TimestampType)))
     println(s"filtered ${filtered.count()}/${transactions.count()} from $fromInstant until $untilInstant")
     filtered
   }
 
-  def save(transactions: Dataset[Transaction], startInstant: Instant)
+  def save(transactions: Dataset[Transaction])
           (implicit appConfig: AppConfig): IO[String] = {
     // TODO logger
     println(s"Saving ${transactions.count()}")
-    val path = appConfig.transactionStorePath + "/dt=" + OffsetDateTime.ofInstant(startInstant, ZoneOffset.UTC).toLocalDate
+    val path = appConfig.transactionStorePath
     IO {
       transactions
         .write
         .mode(SaveMode.Append)
+        .partitionBy("date")
         .parquet(path)
       path
     }

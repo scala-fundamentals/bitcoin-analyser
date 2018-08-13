@@ -46,12 +46,12 @@ object StreamingProducerSpec {
     id = 71826763)
 
   val SampleTransaction = Transaction(
-    date = new Timestamp(1533797395000L),
+    timestamp = new Timestamp(1533797395000L),
     tid = 71826763,
     price = 6339.73,
     sell = false,
     amount = 0.04531827)
 
-  val SampleJsonTransaction = """{"date":"2018-08-09 06:49:55","tid":71826763,"price":6339.73,"sell":false,"amount":0.04531827}"""
+  val SampleJsonTransaction = """{"timestamp":"2018-08-09 06:49:55","date":"2018-08-09","tid":71826763,"price":6339.73,"sell":false,"amount":0.04531827}"""
 
 }

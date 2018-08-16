@@ -23,7 +23,7 @@ import scala.collection.JavaConversions._
 // Use log compaction to ensure high availability ? (2 producers running concurrently)
 // TODO use IOApp
 object StreamingProducerApp extends App {
-  val config = KafkaConfig("localhost:9092", "transactions_draft3")
+  val config = KafkaConfig("localhost:9092", "transactions_draft4")
 
   val pusher = new Pusher("de504dc5763aeef9ff52")
   StreamingProducer.start(pusher, config).unsafeRunSync()

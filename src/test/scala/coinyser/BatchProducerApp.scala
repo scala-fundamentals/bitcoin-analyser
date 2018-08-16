@@ -19,7 +19,7 @@ object BatchProducerApp extends App {
     topic = "transaction_btcusd",
     bootstrapServers = "localhost:9092",
     checkpointLocation = checkpointDir,
-    transactionStorePath = "/home/mikael/projects/scala-fundamentals/bitcoin-analyser/data/transactions/currency_pair=btcusd",
+    transactionStorePath = "/home/mikael/projects/scala-fundamentals/bitcoin-analyser/data/transactions2/currency_pair=btcusd",
     firstInterval = 1.day,
     intervalBetweenReads = 1.hour
   )
@@ -40,11 +40,4 @@ object BatchProducerApp extends App {
     Source.fromURL(new URL("https://www.bitstamp.net/api/v2/transactions/btcusd/?time=hour")).mkString
   }
   BatchProducer.processRepeatedly(initialJsonTxs, nextJsonTxs).unsafeRunSync()
-
-  // TODO in Zeppelin:
-  // val ds = spark.read.parquet("/tmp/coinyser/transaction/2018-07-26")
-  // ds.groupBy(window($"date", "1 hour").as("w")).agg(count($"tid")).sort($"w").show(100,false)
-  //  appendLastMinuteTransactions(spark.emptyDataset[Transaction])
-
-
 }

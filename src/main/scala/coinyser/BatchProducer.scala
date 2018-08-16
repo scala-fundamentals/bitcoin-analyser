@@ -47,7 +47,9 @@ object BatchProducer {
     import appCtx._
     import spark.implicits._
 
+    val firstTxs = filterTxs(previousTransactions, batchStart, previousEnd)
     for {
+      _ <- BatchProducer.save(firstTxs)
       _ <- IO.sleep(config.intervalBetweenReads - MaxReadTime)
 
       beforeRead <- currentInstant
@@ -66,13 +68,12 @@ object BatchProducer {
       }
       transactions <-
         if (batchStart == batchEnd) {
-          IO.pure((previousTransactions union lastTransactions).distinct())
+          IO.pure(filterTxs(previousTransactions.union(lastTransactions).distinct(), previousEnd, end))
         }
         else {
           require(previousEnd.getEpochSecond < batchEnd.getEpochSecond)
-          val firstTxs = filterTxs(previousTransactions, batchStart, previousEnd)
           val tailTxs = filterTxs(lastTransactions, previousEnd, batchEnd)
-          BatchProducer.save(firstTxs union tailTxs).map(_ => lastTransactions)
+          BatchProducer.save(tailTxs).map(_ => lastTransactions)
         }
 
     } yield (transactions, batchEnd, end)

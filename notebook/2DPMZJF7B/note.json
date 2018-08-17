@@ -1,0 +1,472 @@
+{
+  "paragraphs": [
+    {
+      "text": "%spark\ncase class Transaction(timestamp: java.sql.Timestamp,\n                       tid: Int,\n                       price: Double,\n                       sell: Boolean,\n                       amount: Double,\n                       date: String)\nval schema \u003d Seq.empty[Transaction].toDS().schema\n",
+      "user": "anonymous",
+      "dateUpdated": "2018-08-16 07:08:38.880",
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "enabled": true,
+        "results": {},
+        "editorSetting": {
+          "language": "scala",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "editorMode": "ace/mode/scala"
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "defined class Transaction\nschema: org.apache.spark.sql.types.StructType \u003d StructType(StructField(timestamp,TimestampType,true), StructField(tid,IntegerType,false), StructField(price,DoubleType,false), StructField(sell,BooleanType,false), StructField(amount,DoubleType,false), StructField(date,StringType,true))\n"
+          }
+        ]
+      },
+      "apps": [],
+      "jobName": "paragraph_1534195814054_-1010578510",
+      "id": "20180813-223014_1713951346",
+      "dateCreated": "2018-08-13 22:30:14.054",
+      "dateStarted": "2018-08-16 07:08:38.919",
+      "dateFinished": "2018-08-16 07:08:41.776",
+      "status": "FINISHED",
+      "progressUpdateIntervalMs": 500
+    },
+    {
+      "text": "%spark\nval batchDS \u003d spark.read.parquet(\"/home/mikael/projects/scala-fundamentals/bitcoin-analyser/data/transactions2/currency_pair\u003dbtcusd\").as[Transaction]",
+      "user": "anonymous",
+      "dateUpdated": "2018-08-16 07:08:41.823",
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "enabled": true,
+        "results": {},
+        "editorSetting": {
+          "language": "scala",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "editorMode": "ace/mode/scala"
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "batchDS: org.apache.spark.sql.Dataset[Transaction] \u003d [timestamp: timestamp, tid: int ... 4 more fields]\n"
+          }
+        ]
+      },
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "SPARK JOB",
+          "tooltip": "View in Spark web UI",
+          "group": "spark",
+          "values": [
+            "http://asterix.lan:4041/jobs/job?id\u003d14"
+          ],
+          "interpreterSettingId": "spark"
+        }
+      },
+      "apps": [],
+      "jobName": "paragraph_1534196093662_-1355987470",
+      "id": "20180813-223453_2128395545",
+      "dateCreated": "2018-08-13 22:34:53.662",
+      "dateStarted": "2018-08-16 07:08:41.945",
+      "dateFinished": "2018-08-16 07:08:43.613",
+      "status": "FINISHED",
+      "progressUpdateIntervalMs": 500
+    },
+    {
+      "text": "%spark\n// !! TimeZone must be set, or all timestamps will be wrong, they are String in json, because when they are Long Spark multiplies everything by 1000 !\nimport java.util.TimeZone\nTimeZone.setDefault(TimeZone.getTimeZone(\"UTC\"))\nval streamDS \u003d {\n  spark.readStream.format(\"kafka\")\n  .option(\"kafka.bootstrap.servers\", \"localhost:9092\")\n  .option(\"startingoffsets\", \"earliest\")\n  .option(\"subscribe\", \"transactions_draft4\")\n  .load()\n  .select(from_json(col(\"value\").cast(\"string\"), schema).alias(\"v\")).select(\"v.*\").as[Transaction]\n  .withWatermark(\"timestamp\", \"1 second\")\n}",
+      "user": "anonymous",
+      "dateUpdated": "2018-08-16 07:08:43.638",
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "enabled": true,
+        "results": {},
+        "editorSetting": {
+          "language": "scala",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "editorMode": "ace/mode/scala"
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "import java.util.TimeZone\nstreamDS: org.apache.spark.sql.Dataset[Transaction] \u003d [timestamp: timestamp, tid: int ... 4 more fields]\n"
+          }
+        ]
+      },
+      "apps": [],
+      "jobName": "paragraph_1534195974723_-1820890954",
+      "id": "20180813-223254_2056493742",
+      "dateCreated": "2018-08-13 22:32:54.723",
+      "dateStarted": "2018-08-16 07:08:43.761",
+      "dateFinished": "2018-08-16 07:08:46.942",
+      "status": "FINISHED",
+      "progressUpdateIntervalMs": 500
+    },
+    {
+      "text": "%spark\nimport java.time.Instant\nval now \u003d Instant.now\nval batchEnd \u003d new java.sql.Timestamp( ((now.getEpochSecond / 3600 * 3600)) * 1000)\n\n\n//val ds \u003d batchDS.filter($\"timestamp\" \u003c lit(batchEnd)) union streamDS.filter($\"timestamp\" \u003e\u003d lit(batchEnd))\nval ds \u003d streamDS//.filter($\"timestamp\" \u003e\u003d lit(batchEnd)) // TODO filter seems to use the wrong timezone !!\n\n// TODO factorize grouping\nval grouped \u003d { \n  ds\n    .groupBy(window($\"timestamp\", \"2 minute\").as(\"window\"))\n    .agg(\n      count($\"tid\").as(\"count\"), \n      avg(\"price\").as(\"avgPrice\"),\n      stddev(\"price\").as(\"stddevPrice\"),\n      last(\"price\").as(\"lastPrice\"),\n      sum(\"amount\").as(\"sumAmount\")\n    )\n    .select(\"window.start\", \"count\", \"avgPrice\", \"lastPrice\", \"stddevPrice\", \"sumAmount\")\n  //  sort(\"start\")\n}\n//ds.select($\"date\".as[java.sql.Timestamp]).sort($\"date\".desc).head\n",
+      "user": "anonymous",
+      "dateUpdated": "2018-08-16 07:12:58.098",
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "enabled": true,
+        "results": {},
+        "editorSetting": {
+          "language": "scala",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "editorMode": "ace/mode/scala"
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "import java.time.Instant\nnow: java.time.Instant \u003d 2018-08-16T06:08:47.767Z\nbatchEnd: java.sql.Timestamp \u003d 2018-08-16 06:00:00.0\nres21: org.apache.spark.sql.types.StructType \u003d StructType(StructField(timestamp,TimestampType,true), StructField(tid,IntegerType,true), StructField(price,DoubleType,true), StructField(sell,BooleanType,true), StructField(amount,DoubleType,true), StructField(date,DateType,true))\nres22: org.apache.spark.sql.types.StructType \u003d StructType(StructField(timestamp,TimestampType,true), StructField(tid,IntegerType,true), StructField(price,DoubleType,true), StructField(sell,BooleanType,true), StructField(amount,DoubleType,true), StructField(date,StringType,true))\nds: org.apache.spark.sql.Dataset[Transaction] \u003d [timestamp: timestamp, tid: int ... 4 more fields]\ngrouped: org.apache.spark.sql.DataFrame \u003d [start: timestamp, count: bigint ... 4 more fields]\n"
+          }
+        ]
+      },
+      "apps": [],
+      "jobName": "paragraph_1534195807270_644939958",
+      "id": "20180813-223007_1208357696",
+      "dateCreated": "2018-08-13 22:30:07.270",
+      "dateStarted": "2018-08-16 07:08:47.037",
+      "dateFinished": "2018-08-16 07:08:52.652",
+      "status": "FINISHED",
+      "progressUpdateIntervalMs": 500
+    },
+    {
+      "text": "%spark\nval query \u003d {\n  grouped\n    .writeStream\n    .format(\"memory\")        \n    .queryName(\"transactions6\")\n    .outputMode(\"append\")\n    .start()\n}",
+      "user": "anonymous",
+      "dateUpdated": "2018-08-16 07:08:52.742",
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "enabled": true,
+        "results": {},
+        "editorSetting": {
+          "language": "scala",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "editorMode": "ace/mode/scala"
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "query: org.apache.spark.sql.streaming.StreamingQuery \u003d org.apache.spark.sql.execution.streaming.StreamingQueryWrapper@718cceda\n"
+          }
+        ]
+      },
+      "apps": [],
+      "jobName": "paragraph_1534197292786_-211241028",
+      "id": "20180813-225452_209753500",
+      "dateCreated": "2018-08-13 22:54:52.786",
+      "dateStarted": "2018-08-16 07:08:52.875",
+      "dateFinished": "2018-08-16 07:08:55.216",
+      "status": "FINISHED",
+      "progressUpdateIntervalMs": 500
+    },
+    {
+      "text": "%spark\nval batchGrouped \u003d batchDS.\n  groupBy(window($\"timestamp\", \"2 minutes\").as(\"window\")).\n  agg(\n    count($\"tid\").as(\"count\"), \n    avg(\"price\").as(\"avgPrice\"),\n    stddev(\"price\").as(\"stddevPrice\"),\n    last(\"price\").as(\"lastPrice\"),\n    sum(\"amount\").as(\"sumAmount\")\n  ).\n  select(\"window.start\", \"count\", \"avgPrice\", \"lastPrice\", \"stddevPrice\", \"sumAmount\").\n  sort(\"start\")\n  ",
+      "user": "anonymous",
+      "dateUpdated": "2018-08-16 07:08:55.269",
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "enabled": true,
+        "results": {},
+        "editorSetting": {
+          "language": "scala",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "editorMode": "ace/mode/scala"
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TEXT",
+            "data": "batchGrouped: org.apache.spark.sql.Dataset[org.apache.spark.sql.Row] \u003d [start: timestamp, count: bigint ... 4 more fields]\n"
+          }
+        ]
+      },
+      "apps": [],
+      "jobName": "paragraph_1534200294321_2051761780",
+      "id": "20180813-234454_1936449357",
+      "dateCreated": "2018-08-13 23:44:54.321",
+      "dateStarted": "2018-08-16 07:08:55.442",
+      "dateFinished": "2018-08-16 07:08:57.509",
+      "status": "FINISHED",
+      "progressUpdateIntervalMs": 500
+    },
+    {
+      "text": "%spark\n// z.show(spark.table(\"transactions6\").filter($\"start\" \u003e\u003d lit(batchEnd)).union(batchGrouped).sort(\"start\"))\nz.show(\n  batchGrouped.filter($\"start\" \u003c lit(batchEnd) \u0026\u0026 $\"start\" \u003e\u003d lit(\"2018-08-16 00:00:00\"))\n  .union(spark.table(\"transactions6\").filter($\"start\" \u003e\u003d lit(batchEnd)))\n  .sort($\"start\"))\n\n",
+      "user": "anonymous",
+      "dateUpdated": "2018-08-17 15:53:55.230",
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "enabled": true,
+        "results": {
+          "0": {
+            "graph": {
+              "mode": "lineChart",
+              "height": 300.0,
+              "optionOpen": true,
+              "setting": {
+                "table": {
+                  "tableGridState": {
+                    "columns": [
+                      {
+                        "name": "start",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "count",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "avgPrice",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "lastPrice",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "stddevPrice",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      },
+                      {
+                        "name": "sumAmount",
+                        "visible": true,
+                        "width": "*",
+                        "sort": {},
+                        "filters": [
+                          {}
+                        ],
+                        "pinned": ""
+                      }
+                    ],
+                    "scrollFocus": {},
+                    "selection": [],
+                    "grouping": {
+                      "grouping": [],
+                      "aggregations": [],
+                      "rowExpandedStates": {}
+                    },
+                    "treeView": {},
+                    "pagination": {
+                      "paginationCurrentPage": 1.0,
+                      "paginationPageSize": 250.0
+                    }
+                  },
+                  "tableColumnTypeState": {
+                    "names": {
+                      "start": "string",
+                      "count": "string",
+                      "avgPrice": "string",
+                      "lastPrice": "string",
+                      "stddevPrice": "string",
+                      "sumAmount": "string"
+                    },
+                    "updated": false
+                  },
+                  "tableOptionSpecHash": "[{\"name\":\"useFilter\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable filter for columns\"},{\"name\":\"showPagination\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable pagination for better navigation\"},{\"name\":\"showAggregationFooter\",\"valueType\":\"boolean\",\"defaultValue\":false,\"widget\":\"checkbox\",\"description\":\"Enable a footer for displaying aggregated values\"}]",
+                  "tableOptionValue": {
+                    "useFilter": false,
+                    "showPagination": false,
+                    "showAggregationFooter": false
+                  },
+                  "updated": false,
+                  "initialized": false
+                },
+                "lineChart": {
+                  "rotate": {
+                    "degree": "-45"
+                  },
+                  "xLabelStatus": "default"
+                }
+              },
+              "commonSetting": {},
+              "keys": [
+                {
+                  "name": "start",
+                  "index": 0.0,
+                  "aggr": "sum"
+                }
+              ],
+              "groups": [],
+              "values": [
+                {
+                  "name": "avgPrice",
+                  "index": 2.0,
+                  "aggr": "sum"
+                }
+              ]
+            },
+            "helium": {}
+          }
+        },
+        "editorSetting": {
+          "language": "scala",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "editorMode": "ace/mode/scala"
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "results": {
+        "code": "SUCCESS",
+        "msg": [
+          {
+            "type": "TABLE",
+            "data": "start\tcount\tavgPrice\tlastPrice\tstddevPrice\tsumAmount\n2018-08-16 00:00:00.0\t11\t6268.022727272727\t6273.34\t3.687286511539415\t1.18192879\n2018-08-16 00:02:00.0\t19\t6262.250526315788\t6264.85\t2.8178902148877185\t3.3923402400000002\n2018-08-16 00:04:00.0\t20\t6261.8555\t6268.51\t4.091358640637238\t2.86074428\n2018-08-16 00:06:00.0\t87\t6238.174942528735\t6254.85\t6.752332047378389\t21.544789610000002\n2018-08-16 00:08:00.0\t93\t6226.115913978492\t6245.23\t11.391802281023114\t53.1981179\n2018-08-16 00:10:00.0\t33\t6227.084242424244\t6227.06\t2.671910634619751\t13.144692750000003\n2018-08-16 00:12:00.0\t36\t6241.107222222222\t6232.2\t4.683429519432341\t17.34896949\n2018-08-16 00:14:00.0\t18\t6247.088888888889\t6244.69\t4.735676719004961\t4.452141080000001\n2018-08-16 00:16:00.0\t18\t6259.077222222222\t6254.33\t2.7395895045778818\t3.6255840499999996\n2018-08-16 00:18:00.0\t33\t6252.180606060608\t6257.71\t7.260011165363653\t17.79603899\n2018-08-16 00:20:00.0\t52\t6244.819615384621\t6243.96\t2.8609740296260315\t10.388830030000001\n2018-08-16 00:22:00.0\t29\t6244.329310344826\t6247.33\t2.3085012624685324\t2.5214534599999996\n2018-08-16 00:24:00.0\t19\t6260.591578947367\t6252.33\t4.622476805010668\t11.30007331\n2018-08-16 00:26:00.0\t18\t6259.087777777778\t6269.39\t5.405841672025189\t2.71538204\n2018-08-16 00:28:00.0\t16\t6254.779375\t6256.47\t1.5677392161965338\t9.41040867\n2018-08-16 00:30:00.0\t12\t6256.385833333334\t6258.85\t3.601745683650826\t1.5431705999999998\n2018-08-16 00:32:00.0\t18\t6261.855555555556\t6256.08\t3.516311941964272\t1.320408089999999\n2018-08-16 00:34:00.0\t27\t6264.174074074075\t6264.6\t6.4321023356158085\t10.458767159999997\n2018-08-16 00:36:00.0\t33\t6270.6942424242425\t6260.64\t5.699038312680111\t41.926107650000006\n2018-08-16 00:38:00.0\t16\t6257.970625\t6262.03\t2.9510483306783835\t12.572713230000002\n2018-08-16 00:40:00.0\t17\t6260.274705882353\t6253.73\t5.258431464856121\t18.195325730000004\n2018-08-16 00:42:00.0\t7\t6260.287142857143\t6265.5\t3.539796200751963\t11.21941859\n2018-08-16 00:44:00.0\t6\t6264.195\t6263.82\t0.5809561084969959\t1.03989958\n2018-08-16 00:46:00.0\t9\t6270.8822222222225\t6269.33\t2.1865485232312287\t1.9530322199999999\n2018-08-16 00:48:00.0\t9\t6273.38\t6272.49\t2.199812492009197\t1.2242705500000002\n2018-08-16 00:50:00.0\t25\t6286.886399999999\t6279.82\t4.7765362973598915\t14.28116003\n2018-08-16 00:52:00.0\t75\t6310.047466666668\t6296.96\t6.233241552533816\t45.08922363\n2018-08-16 00:54:00.0\t42\t6309.1059523809545\t6309.49\t5.346855953085095\t15.92785276\n2018-08-16 00:56:00.0\t7\t6296.389999999999\t6300.92\t4.166973322049145\t1.86831172\n2018-08-16 00:58:00.0\t11\t6300.408181818181\t6307.74\t3.791410867162205\t2.8170549\n2018-08-16 01:00:00.0\t10\t6295.734\t6291.12\t2.4092885072384007\t2.8753055199999995\n2018-08-16 01:02:00.0\t8\t6290.495\t6290.64\t3.7202880072840925\t0.50498166\n2018-08-16 01:04:00.0\t23\t6280.138695652174\t6282.98\t6.541101036278257\t20.30238617\n2018-08-16 01:06:00.0\t11\t6287.249090909091\t6279.96\t5.347637711261916\t1.6188239100000001\n2018-08-16 01:08:00.0\t1\t6288.26\t6288.26\tNaN\t0.01512248\n2018-08-16 01:10:00.0\t11\t6287.677272727273\t6294.44\t2.781931310830864\t1.00737441\n2018-08-16 01:12:00.0\t10\t6276.611999999999\t6284.91\t4.457903842241503\t4.29272007\n2018-08-16 01:14:00.0\t21\t6273.71619047619\t6275.15\t3.082214262816008\t4.77660978\n2018-08-16 01:16:00.0\t11\t6264.132727272728\t6263.53\t3.0157257531450234\t2.7272676400000004\n2018-08-16 01:18:00.0\t10\t6268.175\t6266.16\t2.2008697775601687\t0.44106331\n2018-08-16 01:20:00.0\t6\t6265.268333333333\t6269.79\t5.064785944802128\t1.21952448\n2018-08-16 01:22:00.0\t38\t6256.5102631578975\t6262.79\t2.1102074790294223\t6.587926989999999\n2018-08-16 01:24:00.0\t7\t6256.118571428572\t6253.61\t1.7568857729082044\t1.3516511400000002\n2018-08-16 01:26:00.0\t20\t6250.118\t6257.29\t2.7102876134036897\t10.044686749999999\n2018-08-16 01:28:00.0\t18\t6254.567222222222\t6253.34\t1.6099865017903856\t2.3919636800000004\n2018-08-16 01:30:00.0\t17\t6259.8405882352945\t6253.32\t4.617720582966514\t2.2174038300000003\n2018-08-16 01:32:00.0\t9\t6269.29\t6268.26\t1.3789670046813103\t1.18217141\n2018-08-16 01:34:00.0\t17\t6272.314705882353\t6268.08\t2.476777436627783\t4.01774678\n2018-08-16 01:36:00.0\t18\t6259.715555555556\t6272.26\t6.073272421725979\t5.16394775\n2018-08-16 01:38:00.0\t36\t6251.073055555555\t6255.07\t2.398976947955727\t2.7227908000000007\n2018-08-16 01:40:00.0\t11\t6254.48\t6253.78\t2.1315346584096333\t1.4113773899999997\n2018-08-16 01:42:00.0\t23\t6253.40347826087\t6251.77\t2.566170845115902\t4.243278310000001\n2018-08-16 01:44:00.0\t14\t6256.765714285714\t6255.08\t2.0217726962160256\t2.55332154\n2018-08-16 01:46:00.0\t6\t6256.25\t6257.11\t0.852854032058949\t0.15160712999999998\n2018-08-16 01:48:00.0\t11\t6253.8654545454565\t6257.44\t2.328825298884804\t0.6298097899999999\n2018-08-16 01:50:00.0\t18\t6258.992777777779\t6251.52\t6.821852263179679\t4.15475121\n2018-08-16 01:52:00.0\t14\t6265.86357142857\t6263.58\t1.1840062833958875\t1.2912997800000003\n2018-08-16 01:54:00.0\t20\t6275.760500000001\t6267.72\t3.403181908929129\t4.3590125\n2018-08-16 01:56:00.0\t28\t6271.38\t6271.72\t1.0066298742358593\t20.245227030000002\n2018-08-16 01:58:00.0\t23\t6268.423913043478\t6272.7\t2.363167633668719\t21.996843620000003\n2018-08-16 02:00:00.0\t11\t6262.165454545455\t6263.47\t1.7590188380817893\t0.31110995\n2018-08-16 02:02:00.0\t13\t6266.00076923077\t6260.95\t2.9774414674864818\t2.75807877\n2018-08-16 02:04:00.0\t9\t6265.438888888888\t6265.78\t1.1978881880672136\t7.94112578\n2018-08-16 02:06:00.0\t4\t6266.224999999999\t6266.12\t0.07000000000016371\t3.34103045\n2018-08-16 02:08:00.0\t16\t6268.304999999999\t6268.42\t2.1231957045924195\t6.693933799999999\n2018-08-16 02:10:00.0\t4\t6269.5275\t6268.77\t0.892650547526605\t0.65442912\n2018-08-16 02:12:00.0\t12\t6269.447500000001\t6270.46\t1.6512261284487357\t0.70759921\n2018-08-16 02:14:00.0\t12\t6272.748333333334\t6268.76\t2.574344871059944\t12.012707330000001\n2018-08-16 02:16:00.0\t6\t6278.010000000001\t6275.4\t1.90572820727415\t0.50909772\n2018-08-16 02:18:00.0\t9\t6285.429999999999\t6279.74\t3.1538310037162347\t1.30880518\n2018-08-16 02:20:00.0\t27\t6289.882592592594\t6285.38\t1.9502575620679945\t10.951612120000002\n2018-08-16 02:22:00.0\t12\t6290.035000000001\t6290.52\t1.8313507186078952\t2.5555051999999994\n2018-08-16 02:24:00.0\t20\t6284.0585\t6284.35\t1.3035509196037682\t6.286374479999999\n2018-08-16 02:26:00.0\t5\t6286.236000000001\t6286.34\t0.14240786495139354\t0.7256715799999999\n2018-08-16 02:28:00.0\t4\t6286.3724999999995\t6288.87\t2.5081517099249906\t0.21254952\n2018-08-16 02:30:00.0\t10\t6285.609000000001\t6284.34\t1.4550330274984233\t3.0637869400000004\n2018-08-16 02:32:00.0\t2\t6285.605\t6283.0\t3.6840263299819385\t0.12572603\n2018-08-16 02:34:00.0\t7\t6291.702857142858\t6288.21\t2.2087908780275627\t2.7392171100000002\n2018-08-16 02:36:00.0\t14\t6289.311428571427\t6287.89\t1.0179455716358181\t0.6000423600000001\n2018-08-16 02:38:00.0\t36\t6285.533333333335\t6286.13\t0.6531243591933926\t0.6381963500000004\n2018-08-16 02:40:00.0\t2\t6286.285\t6288.67\t3.3728993462601404\t0.38440305999999996\n2018-08-16 02:42:00.0\t9\t6279.474444444445\t6281.34\t2.3233494738796856\t1.2549324800000001\n2018-08-16 02:44:00.0\t7\t6273.064285714286\t6276.0\t2.5357238095062735\t0.35389406000000007\n2018-08-16 02:46:00.0\t15\t6275.0059999999985\t6270.12\t3.753536998618731\t1.23275255\n2018-08-16 02:48:00.0\t10\t6282.918999999999\t6283.35\t1.2147560340338364\t0.93454332\n2018-08-16 02:50:00.0\t4\t6282.285\t6281.94\t0.31775252424914874\t3.07953833\n2018-08-16 02:52:00.0\t9\t6287.068888888889\t6286.87\t0.2053925780333049\t1.52164447\n2018-08-16 02:54:00.0\t12\t6288.3175\t6288.5\t0.6029944218043931\t0.29824138\n2018-08-16 02:56:00.0\t7\t6290.5485714285705\t6289.46\t1.83177899477915\t1.47889124\n2018-08-16 02:58:00.0\t7\t6294.0485714285705\t6296.71\t1.9057931732086797\t1.04752451\n2018-08-16 03:00:00.0\t7\t6298.141428571429\t6297.05\t1.3536177275659116\t0.64648591\n2018-08-16 03:02:00.0\t36\t6305.123333333333\t6299.93\t3.3509103240762754\t11.199411210000001\n2018-08-16 03:04:00.0\t36\t6302.013888888886\t6303.34\t3.65577685922479\t5.023629630000001\n2018-08-16 03:06:00.0\t30\t6323.373666666668\t6309.73\t7.779514426533802\t31.146748810000002\n2018-08-16 03:08:00.0\t33\t6323.421212121212\t6325.17\t2.6902169494017163\t5.01679701\n2018-08-16 03:10:00.0\t5\t6320.248\t6324.97\t3.2424712797495303\t0.64799079\n2018-08-16 03:12:00.0\t2\t6311.99\t6311.19\t1.1313708498987332\t0.04150367\n2018-08-16 03:14:00.0\t4\t6311.1275000000005\t6311.2\t1.4357663458934702\t0.07965573000000001\n2018-08-16 03:16:00.0\t17\t6305.480000000001\t6308.94\t2.6037160943543185\t2.05446157\n2018-08-16 03:18:00.0\t23\t6305.891739130435\t6302.57\t2.8258058419021306\t6.546259279999999\n2018-08-16 03:20:00.0\t15\t6305.248000000001\t6307.0\t3.6613896659213285\t6.2847801400000005\n2018-08-16 03:22:00.0\t22\t6299.795454545455\t6294.0\t4.687622737210174\t5.323867849999999\n2018-08-16 03:24:00.0\t13\t6309.962307692307\t6307.19\t2.9130572538320005\t4.1943335600000005\n2018-08-16 03:26:00.0\t15\t6315.204\t6312.56\t1.8743257835440863\t0.34454827\n2018-08-16 03:28:00.0\t4\t6318.07\t6319.86\t2.8294522438098917\t0.03060067\n2018-08-16 03:30:00.0\t3\t6313.41\t6311.65\t1.5810123339179354\t0.22232879\n2018-08-16 03:32:00.0\t11\t6312.693636363637\t6309.17\t2.6582937111132625\t1.1687670199999998\n2018-08-16 03:34:00.0\t7\t6315.812857142858\t6316.05\t1.6391025418981378\t1.8716310100000002\n2018-08-16 03:36:00.0\t3\t6316.079999999999\t6318.08\t3.352148564726715\t1.0904498\n2018-08-16 03:38:00.0\t4\t6311.28\t6310.02\t2.5200132274785942\t1.58955947\n2018-08-16 03:40:00.0\t6\t6311.613333333332\t6311.63\t2.1174387043469776\t0.22438964\n2018-08-16 03:42:00.0\t16\t6308.746874999999\t6308.1\t1.5760614148352523\t8.67638502\n2018-08-16 03:44:00.0\t13\t6307.485384615385\t6311.28\t2.4594159719486712\t1.3946948100000003\n2018-08-16 03:46:00.0\t11\t6301.942727272728\t6307.48\t2.9333362947642247\t8.82586568\n2018-08-16 03:48:00.0\t28\t6293.679285714286\t6298.5\t4.945520179037509\t11.24856242\n2018-08-16 03:50:00.0\t11\t6286.094545454546\t6291.91\t5.366983069912633\t0.7884831600000001\n2018-08-16 03:52:00.0\t39\t6277.110512820512\t6280.0\t5.871057892981075\t14.821566399999998\n2018-08-16 03:54:00.0\t14\t6283.667142857143\t6283.23\t2.071069692291684\t9.131288629999997\n2018-08-16 03:56:00.0\t28\t6288.134642857142\t6283.95\t2.822736368927733\t4.857260569999999\n2018-08-16 03:58:00.0\t5\t6283.322\t6284.33\t2.7224290624365866\t0.41854989\n2018-08-16 04:00:00.0\t22\t6264.062272727272\t6269.28\t4.503743344436492\t13.411279399999998\n2018-08-16 04:02:00.0\t17\t6265.801176470588\t6264.9\t2.2161449703059604\t7.080742279999999\n2018-08-16 04:04:00.0\t11\t6269.799090909091\t6264.64\t3.782711869929808\t2.36138842\n2018-08-16 04:06:00.0\t6\t6277.516666666667\t6277.05\t2.227237451792551\t8.82843404\n2018-08-16 04:08:00.0\t16\t6276.1575\t6275.38\t0.984882395686601\t6.34097066\n2018-08-16 04:10:00.0\t11\t6286.423636363636\t6281.01\t3.705653175156136\t4.1573214400000005\n2018-08-16 04:12:00.0\t9\t6294.986666666668\t6289.08\t2.887226177492914\t1.5954194800000001\n2018-08-16 04:14:00.0\t16\t6298.095624999999\t6296.13\t4.230796566053967\t3.95792179\n2018-08-16 04:16:00.0\t30\t6300.438000000001\t6298.61\t2.8621313495482235\t6.532614140000001\n2018-08-16 04:18:00.0\t16\t6300.48125\t6302.72\t1.268862351347711\t1.0205239599999998\n2018-08-16 04:20:00.0\t20\t6302.059\t6301.31\t1.4511915249562501\t1.69726067\n2018-08-16 04:22:00.0\t2\t6297.17\t6297.17\t0.0\t0.5\n2018-08-16 04:24:00.0\t2\t6293.6\t6292.65\t1.3435028842548262\t0.04092797\n2018-08-16 04:26:00.0\t7\t6291.335714285715\t6291.19\t1.9109060428922502\t1.03479266\n2018-08-16 04:28:00.0\t3\t6291.776666666668\t6292.47\t3.6102816141310803\t0.15408280000000002\n2018-08-16 04:30:00.0\t7\t6296.804285714286\t6292.51\t3.745854851889998\t0.84472647\n2018-08-16 04:32:00.0\t27\t6313.402962962961\t6300.71\t8.126258394770126\t22.51588925\n2018-08-16 04:34:00.0\t14\t6316.662857142857\t6317.87\t1.9864596592989403\t1.9414361699999996\n2018-08-16 04:36:00.0\t9\t6311.987777777778\t6316.51\t3.285090477360536\t3.072919550000001\n2018-08-16 04:38:00.0\t8\t6314.387499999999\t6315.13\t3.52917129082729\t3.3975505900000003\n2018-08-16 04:40:00.0\t5\t6318.778\t6314.21\t3.8311316865909224\t0.44266968\n2018-08-16 04:42:00.0\t8\t6318.3575\t6321.18\t2.445005112468911\t3.04368206\n2018-08-16 04:44:00.0\t11\t6314.210000000001\t6315.63\t2.978311602233317\t3.4199600599999997\n2018-08-16 04:46:00.0\t14\t6301.857142857143\t6307.43\t3.719736195301803\t12.22542648\n2018-08-16 04:48:00.0\t2\t6300.605\t6301.63\t1.449568901432551\t0.00523544\n2018-08-16 04:50:00.0\t1\t6299.83\t6299.83\tNaN\t0.01609321\n2018-08-16 04:52:00.0\t4\t6302.65\t6303.92\t0.9327021675398545\t1.9396477499999998\n2018-08-16 04:54:00.0\t6\t6308.075\t6304.5\t3.666539240209871\t0.7291251599999999\n2018-08-16 04:56:00.0\t5\t6310.462\t6307.18\t3.889398411065602\t0.10661149\n2018-08-16 04:58:00.0\t11\t6311.908181818182\t6318.41\t2.4460573099657097\t2.6037944\n2018-08-16 05:00:00.0\t21\t6316.466666666664\t6313.16\t2.749538749196512\t2.48974408\n2018-08-16 05:02:00.0\t28\t6307.438571428572\t6317.0\t4.921728629091567\t21.09152726\n2018-08-16 05:04:00.0\t16\t6301.253125000001\t6302.32\t1.128099988180803\t5.02415211\n2018-08-16 05:06:00.0\t13\t6297.826153846153\t6296.7\t1.966488149221071\t1.36728514\n2018-08-16 05:08:00.0\t4\t6292.8775000000005\t6296.17\t2.4335622038485294\t0.26510405\n2018-08-16 05:10:00.0\t14\t6301.284285714285\t6295.11\t3.549645083636053\t8.157770869999998\n"
+          }
+        ]
+      },
+      "runtimeInfos": {
+        "jobUrl": {
+          "propertyName": "jobUrl",
+          "label": "SPARK JOB",
+          "tooltip": "View in Spark web UI",
+          "group": "spark",
+          "values": [
+            "http://asterix.lan:4041/jobs/job?id\u003d21",
+            "http://asterix.lan:4041/jobs/job?id\u003d22"
+          ],
+          "interpreterSettingId": "spark"
+        }
+      },
+      "apps": [],
+      "jobName": "paragraph_1534196177676_-863570502",
+      "id": "20180813-223617_1395457650",
+      "dateCreated": "2018-08-13 22:36:17.676",
+      "dateStarted": "2018-08-16 07:14:32.667",
+      "dateFinished": "2018-08-16 07:14:36.641",
+      "status": "FINISHED",
+      "progressUpdateIntervalMs": 500
+    },
+    {
+      "text": "%spark\n",
+      "user": "anonymous",
+      "dateUpdated": "2018-08-16 07:09:10.049",
+      "config": {
+        "colWidth": 12.0,
+        "fontSize": 9.0,
+        "enabled": true,
+        "results": {},
+        "editorSetting": {
+          "language": "scala",
+          "editOnDblClick": false,
+          "completionKey": "TAB",
+          "completionSupport": true
+        },
+        "editorMode": "ace/mode/scala"
+      },
+      "settings": {
+        "params": {},
+        "forms": {}
+      },
+      "apps": [],
+      "jobName": "paragraph_1534198810871_918627058",
+      "id": "20180813-232010_924878750",
+      "dateCreated": "2018-08-13 23:20:10.872",
+      "status": "FINISHED",
+      "progressUpdateIntervalMs": 500
+    }
+  ],
+  "name": "Combined Analytics",
+  "id": "2DPMZJF7B",
+  "noteParams": {},
+  "noteForms": {},
+  "angularObjects": {
+    "md:shared_process": [],
+    "spark:shared_process": []
+  },
+  "config": {
+    "isZeppelinNotebookCronEnable": false
+  },
+  "info": {}
+}

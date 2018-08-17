@@ -139,7 +139,7 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
           (ds1, start1, end1) = tuple1
           _ <- IO {
             ds1.collect() should contain theSameElementsAs txs1
-            start1 should ===(Instant.parse("2018-08-02T06:24:00Z"))
+            start1 should ===(Instant.parse("2018-08-02T06:23:26Z"))
             end1 should ===(Instant.parse("2018-08-02T06:24:12Z")) // initialClock + 1mn - 15s - 5s
           }
 
@@ -147,9 +147,10 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
             IO(txs2.toDS()), ds1, start1, end1)
           (ds2, start2, end2) = tuple2
           _ <- IO {
-              // TODO change assertion, and change start2 to 2018-08-02T06:24:12Z"
-//            ds2.collect() should contain theSameElementsAs (txs1 union txs2)
-            start2 should ===(Instant.parse("2018-08-02T06:24:00Z"))
+              // TODO change assertion
+            println(ds2.collect().map(_.tid).sorted.toList)
+            ds2.collect() should contain theSameElementsAs txs2
+            start2 should ===(Instant.parse("2018-08-02T06:24:12Z"))
             end2 should ===(Instant.parse("2018-08-02T06:24:57Z")) // initialClock + 1mn -15s + 1mn -15s -5s = end1 + 45s
           }
 
@@ -158,7 +159,7 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
           (ds3, start3, end3) = tuple3
           _ <- IO {
             ds3.collect() should contain theSameElementsAs txs3
-            start3 should ===(Instant.parse("2018-08-02T06:25:00Z"))
+            start3 should ===(Instant.parse("2018-08-02T06:24:57Z"))
             end3 should ===(Instant.parse("2018-08-02T06:25:42Z"))
           }
         } yield ()
@@ -166,16 +167,6 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
       threeBatchesIO.unsafeRunSync()
       val savedTransactions = spark.read.parquet(appConfig.transactionStorePath).as[Transaction].collect()
       savedTransactions.map(_.tid).sorted should contain theSameElementsAs expectedTxs.map(_.tid).sorted
-    }
-
-    "work when we start exactly on a boundary" in {
-//      previousEnd: 2018-08-14T20:50:00Z
-//        end        : 2018-08-14T20:50:40Z
-//        beforeRead : 2018-08-14T20:50:45Z
-//        batchStart      : 2018-08-14T00:00:00Z
-//        batchEnd        : 2018-08-14T20:50:00Z
-      // => requirement failed
-      pending
     }
 
 

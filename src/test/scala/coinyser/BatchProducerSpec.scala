@@ -75,6 +75,19 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
   val transaction1 = Transaction(timestamp = new Timestamp(1532365695000L), tid = 70683282, price = 7740.00, sell = false, amount = 0.10041719)
   val transaction2 = Transaction(timestamp = new Timestamp(1532365693000L), tid = 70683281, price = 7739.99, sell = false, amount = 0.00148564)
 
+  "BatchProducer.jsonToHttpTransaction" should {
+    "create a Dataset[HttpTransaction] from a Json string" in {
+      val json =
+        """[{"date": "1532365695", "tid": "70683282", "price": "7740.00", "type": "0", "amount": "0.10041719"},
+          |{"date": "1532365693", "tid": "70683281", "price": "7739.99", "type": "0", "amount": "0.00148564"}]""".stripMargin
+      val httpTransaction1 = HttpTransaction("1532365695", "70683282", "7740.00", "0", "0.10041719")
+      val httpTransaction2 = HttpTransaction("1532365693", "70683281", "7739.99", "0", "0.00148564")
+
+      val ds: Dataset[HttpTransaction] = BatchProducer.jsonToHttpTransactions(json)
+      ds.collect() should contain theSameElementsAs Seq(httpTransaction1, httpTransaction2)
+    }
+  }
+
   "TransactionDataBatchProducer.readTransactions" should {
     "create a Dataset[Transaction] from a Json String" in {
       val txIO = IO(
@@ -147,7 +160,7 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
             IO(txs2.toDS()), ds1, start1, end1)
           (ds2, start2, end2) = tuple2
           _ <- IO {
-              // TODO change assertion
+            // TODO change assertion
             println(ds2.collect().map(_.tid).sorted.toList)
             ds2.collect() should contain theSameElementsAs txs2
             start2 should ===(Instant.parse("2018-08-02T06:24:12Z"))

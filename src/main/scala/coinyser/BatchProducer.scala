@@ -11,7 +11,6 @@ import org.apache.spark.sql.{Dataset, SaveMode, SparkSession}
 
 import scala.concurrent.duration._
 import cats.implicits._
-import coinyser.AppConfig
 
 class AppContext(implicit val config: AppConfig,
                  implicit val spark: SparkSession,
@@ -79,21 +78,31 @@ object BatchProducer {
 
   }
 
-  def readTransactions(jsonTxs: IO[String])(implicit spark: SparkSession): IO[Dataset[Transaction]] = {
+  def jsonToHttpTransactions(json: String)(implicit spark: SparkSession): Dataset[HttpTransaction] = {
     import spark.implicits._
     val txSchema = Seq.empty[HttpTransaction].toDS().schema
     val schema = ArrayType(txSchema)
-    jsonTxs.map(json =>
-      Seq(json).toDS()
-        .select(explode(from_json($"value".cast(StringType), schema)).alias("v"))
-        .select(
-          $"v.date".cast(LongType).cast(TimestampType).as("timestamp"),
-          $"v.date".cast(LongType).cast(TimestampType).cast(DateType).as("date"),
-          $"v.tid".cast(IntegerType),
-          $"v.price".cast(DoubleType),
-          $"v.type".cast(BooleanType).as("sell"),
-          $"v.amount".cast(DoubleType))
-        .as[Transaction])
+    Seq(json).toDS()
+      .select(explode(from_json($"value".cast(StringType), schema)).alias("v"))
+      .select("v.*")
+      .as[HttpTransaction]
+  }
+
+  def toTransactions(ds: Dataset[HttpTransaction]): Dataset[Transaction] = {
+    import ds.sparkSession.implicits._
+    ds.select(
+      $"date".cast(LongType).cast(TimestampType).as("timestamp"),
+      $"date".cast(LongType).cast(TimestampType).cast(DateType).as("date"),
+      $"tid".cast(IntegerType),
+      $"price".cast(DoubleType),
+      $"type".cast(BooleanType).as("sell"),
+      $"amount".cast(DoubleType))
+      .as[Transaction]
+  }
+
+  def readTransactions(jsonTxs: IO[String])(implicit spark: SparkSession): IO[Dataset[Transaction]] = {
+    import spark.implicits._
+    jsonTxs.map(json => toTransactions(jsonToHttpTransactions(json)))
   }
 
   def filterTxs(transactions: Dataset[Transaction], fromInstant: Instant, untilInstant: Instant)

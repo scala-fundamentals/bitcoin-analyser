@@ -37,7 +37,7 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
 
   override def afterAll(): Unit = {
     FileUtils.deleteDirectory(checkpointDir)
-    //    FileUtils.deleteDirectory(transactionStoreDir)
+    FileUtils.deleteDirectory(transactionStoreDir)
   }
 
   implicit val appConfig: AppConfig = AppConfig(
@@ -72,8 +72,6 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
   import spark.implicits._
 
 
-  val transaction1 = Transaction(timestamp = new Timestamp(1532365695000L), tid = 70683282, price = 7740.00, sell = false, amount = 0.10041719)
-  val transaction2 = Transaction(timestamp = new Timestamp(1532365693000L), tid = 70683281, price = 7739.99, sell = false, amount = 0.00148564)
 
   "BatchProducer.jsonToHttpTransaction" should {
     "create a Dataset[HttpTransaction] from a Json string" in {
@@ -88,19 +86,6 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
     }
   }
 
-  "TransactionDataBatchProducer.readTransactions" should {
-    "create a Dataset[Transaction] from a Json String" in {
-      val txIO = IO(
-        """[{"date": "1532365695", "tid": "70683282", "price": "7740.00", "type": "0", "amount": "0.10041719"},
-          |{"date": "1532365693", "tid": "70683281", "price": "7739.99", "type": "0", "amount": "0.00148564"}]""".stripMargin)
-
-      val ds: Dataset[Transaction] = BatchProducer.readTransactions(txIO).unsafeRunSync()
-      val data = ds.collect()
-      data should contain theSameElementsAs Seq(transaction1, transaction2)
-    }
-
-    "fail if the json payload is incorrect" in pending
-  }
 
   "BatchProducer.processOneBatch" should {
     "Wait a bit of time, fetch the next batch of transactions, and save a filtered union of the previous and the last batch" in {

@@ -15,4 +15,11 @@ wget http://central.maven.org/maven2/org/apache/kafka/kafka-clients/0.10.0.1/kaf
 ```
 
 ## Kafka
+Start Zookeeper, Kafka, and a console consumer
+```
+bin/zookeeper-server-start.sh config/zookeeper.properties &
+bin/kafka-server-start.sh config/server.properties &
 
+
+bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic transactions --from-beginning
+```

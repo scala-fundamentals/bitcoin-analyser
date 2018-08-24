@@ -1,16 +1,16 @@
 package coinyser
 
-import java.time.{Instant, OffsetDateTime, ZoneOffset}
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 import cats.Monad
 import cats.effect.{IO, Timer}
+import cats.implicits._
 import org.apache.spark.sql.functions.{explode, from_json, lit}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Dataset, SaveMode, SparkSession}
+import org.apache.spark.sql.{Dataset, SaveMode, SparkSession, TypedColumn}
 
 import scala.concurrent.duration._
-import cats.implicits._
 
 class AppContext(implicit val config: AppConfig,
                  implicit val spark: SparkSession,
@@ -80,15 +80,16 @@ object BatchProducer {
 
   def jsonToHttpTransactions(json: String)(implicit spark: SparkSession): Dataset[HttpTransaction] = {
     import spark.implicits._
-    val txSchema = Seq.empty[HttpTransaction].toDS().schema
+    val ds: Dataset[String] = Seq(json).toDS()
+    val txSchema: StructType = Seq.empty[HttpTransaction].toDS().schema
     val schema = ArrayType(txSchema)
-    Seq(json).toDS()
-      .select(explode(from_json($"value".cast(StringType), schema)).alias("v"))
+    val arrayColumn = from_json($"value", schema)
+    ds.select(explode(arrayColumn).alias("v"))
       .select("v.*")
       .as[HttpTransaction]
   }
 
-  def toTransactions(ds: Dataset[HttpTransaction]): Dataset[Transaction] = {
+  def httpToDomainTransactions(ds: Dataset[HttpTransaction]): Dataset[Transaction] = {
     import ds.sparkSession.implicits._
     ds.select(
       $"date".cast(LongType).cast(TimestampType).as("timestamp"),
@@ -101,8 +102,7 @@ object BatchProducer {
   }
 
   def readTransactions(jsonTxs: IO[String])(implicit spark: SparkSession): IO[Dataset[Transaction]] = {
-    import spark.implicits._
-    jsonTxs.map(json => toTransactions(jsonToHttpTransactions(json)))
+    jsonTxs.map(json => httpToDomainTransactions(jsonToHttpTransactions(json)))
   }
 
   def filterTxs(transactions: Dataset[Transaction], fromInstant: Instant, untilInstant: Instant)

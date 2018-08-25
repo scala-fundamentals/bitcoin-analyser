@@ -1,12 +1,10 @@
 package coinyser
 
-import java.sql.Timestamp
+import java.sql.{Date, Timestamp}
 import java.time.ZoneOffset
 
-
-
 case class Transaction(timestamp: Timestamp,
-                       date: String,
+                       date: Date,
                        tid: Int,
                        price: Double,
                        sell: Boolean,
@@ -21,7 +19,8 @@ object Transaction {
             amount: Double) =
     new Transaction(
       timestamp = timestamp,
-      date = timestamp.toLocalDateTime.atOffset(ZoneOffset.UTC).toLocalDate.toString,
+      date = Date.valueOf(
+        timestamp.toInstant.atOffset(ZoneOffset.UTC).toLocalDate),
       tid = tid,
       price = price,
       sell = sell,

@@ -209,7 +209,7 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
 object BatchProducerSpec {
   def parseTransaction(s: String): Transaction =
     s.split('|').toList match {
-      case _ +: date +: tid +: amount +: sell +: price +: Nil =>
+      case _ +: date +: tid +: price +: sell +: amount +: Nil =>
         Transaction(Timestamp.valueOf(date), tid.toInt, price.toDouble, sell.trim.toBoolean, amount.toDouble)
     }
 

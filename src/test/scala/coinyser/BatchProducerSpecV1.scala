@@ -25,8 +25,7 @@ class BatchProducerSpecV1 extends WordSpec with Matchers with SharedSparkSession
 
   "BatchProducer.httpToDomainTransactions" should {
     "transform a Dataset[HttpTransaction] into a Dataset[Transaction]" in {
-      implicit val sparkSession: SparkSession = spark
-      import sparkSession.implicits._
+      import testImplicits._
       val source: Dataset[HttpTransaction] = Seq(httpTransaction1, httpTransaction2).toDS()
       val target: Dataset[Transaction] = BatchProducer.httpToDomainTransactions(source)
       val transaction1 = Transaction(timestamp = new Timestamp(1532365695000L), tid = 70683282, price = 7740.00, sell = false, amount = 0.10041719)
@@ -34,8 +33,6 @@ class BatchProducerSpecV1 extends WordSpec with Matchers with SharedSparkSession
 
       target.collect() should contain theSameElementsAs Seq(transaction1, transaction2)
     }
-
-    "fail if the json payload is incorrect" in pending
   }
 
 }

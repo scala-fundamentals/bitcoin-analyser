@@ -1,9 +1,8 @@
 package coinyser
 
-import java.net.URL
+import java.net.{URI, URL}
 
 import cats.effect.IO
-import coinyser.AppConfig
 import org.apache.spark.sql.SparkSession
 
 import scala.concurrent.duration._
@@ -18,8 +17,7 @@ object BatchProducerApp extends App {
   implicit val appConfig: AppConfig = AppConfig(
     topic = "transaction_btcusd",
     bootstrapServers = "localhost:9092",
-    checkpointLocation = checkpointDir,
-    transactionStorePath = "/home/mikael/projects/scala-fundamentals/bitcoin-analyser/data/transactions2/currency_pair=btcusd",
+    transactionStorePath = new URI("/home/mikael/projects/scala-fundamentals/bitcoin-analyser/data/transactions2/currency_pair=btcusd"),
     firstInterval = 1.day,
     intervalBetweenReads = 1.hour
   )

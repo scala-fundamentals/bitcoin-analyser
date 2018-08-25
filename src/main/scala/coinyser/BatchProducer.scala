@@ -1,5 +1,6 @@
 package coinyser
 
+import java.net.URI
 import java.time.Instant
 import java.util.concurrent.TimeUnit
 
@@ -51,7 +52,7 @@ object BatchProducer {
     println("saveEnd   : " + saveEnd)
     val firstTxs = filterTxs(transactions, saveStart, saveEnd)
     for {
-      _ <- BatchProducer.save(firstTxs)
+      _ <- BatchProducer.save(firstTxs, appCtx.config.transactionStorePath)
       _ <- IO.sleep(config.intervalBetweenReads - MaxReadTime)
 
       beforeRead <- currentInstant
@@ -115,18 +116,13 @@ object BatchProducer {
     filtered
   }
 
-  def save(transactions: Dataset[Transaction])
-          (implicit appConfig: AppConfig): IO[String] = {
-    // TODO logger
-    println(s"Saving ${transactions.count()}")
-    val path = appConfig.transactionStorePath
+  def save(transactions: Dataset[Transaction], path: URI): IO[Unit] = {
     IO {
       transactions
         .write
         .mode(SaveMode.Append)
         .partitionBy("date")
-        .parquet(path)
-      path
+        .parquet(path.toString)
     }
   }
 

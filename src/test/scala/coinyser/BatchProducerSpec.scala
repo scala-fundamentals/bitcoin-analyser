@@ -1,13 +1,13 @@
 package coinyser
 
 import java.io.File
+import java.net.URI
 import java.nio.file.Files
 import java.sql.Timestamp
 import java.time.{Instant, OffsetDateTime}
 import java.util.concurrent.TimeUnit
 
 import cats.effect.{IO, Timer}
-import coinyser.draft.TransactionDataProducerSpec._
 import org.apache.commons.io.FileUtils
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.streaming.MemoryStream
@@ -32,19 +32,16 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
     .appName("BatchProducerSpec")
     .getOrCreate()
 
-  val checkpointDir: File = Files.createTempDirectory("TransactionDataProducerSpec_checkpoint").toFile
-  val transactionStoreDir: File = Files.createTempDirectory("TransactionDataBatchProducerSpec_transactions").toFile
+  val transactionStoreDir: URI = Files.createTempDirectory("TransactionDataBatchProducerSpec_transactions").toUri
 
   override def afterAll(): Unit = {
-    FileUtils.deleteDirectory(checkpointDir)
-    FileUtils.deleteDirectory(transactionStoreDir)
+    FileUtils.deleteDirectory(new File(transactionStoreDir))
   }
 
   implicit val appConfig: AppConfig = AppConfig(
     topic = "transaction_btcusd",
     bootstrapServers = "localhost:9092",
-    checkpointLocation = checkpointDir.toString,
-    transactionStorePath = transactionStoreDir.toString,
+    transactionStorePath = transactionStoreDir,
     firstInterval = 1.day,
     intervalBetweenReads = 1.minute
   )
@@ -163,7 +160,7 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
         } yield ()
 
       threeBatchesIO.unsafeRunSync()
-      val savedTransactions = spark.read.parquet(appConfig.transactionStorePath).as[Transaction].collect()
+      val savedTransactions = spark.read.parquet(appConfig.transactionStorePath.toString).as[Transaction].collect()
       savedTransactions.map(_.tid).sorted should contain theSameElementsAs expectedTxs.map(_.tid).sorted
     }
 
@@ -188,7 +185,7 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
         } yield ()
         io.unsafeRunTimed(35.seconds)
 
-        val savedTransactions = spark.read.parquet(appConfig.transactionStorePath).as[Transaction]
+        val savedTransactions = spark.read.parquet(appConfig.transactionStorePath.toString).as[Transaction]
         val counts = savedTransactions
           .groupBy(window($"date", "10 seconds").as("window"))
           .agg(count($"tid").as("count"))

@@ -1,8 +1,6 @@
 package coinyser
 
 import java.util.Properties
-
-import coinyser.draft.BitstampReceiver
 import com.pusher.client.Pusher
 import com.pusher.client.connection.ConnectionEventListener
 import org.apache.spark.storage.StorageLevel

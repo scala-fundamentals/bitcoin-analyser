@@ -116,14 +116,16 @@ object BatchProducer {
     filtered
   }
 
-  def save(transactions: Dataset[Transaction], path: URI): IO[Unit] = {
-    IO {
-      transactions
-        .write
-        .mode(SaveMode.Append)
-        .partitionBy("date")
-        .parquet(path.toString)
-    }
-  }
+  def unsafeSave(transactions: Dataset[Transaction], path: URI): Unit =
+    transactions
+      .write
+      .mode(SaveMode.Append)
+      .partitionBy("date")
+      .parquet(path.toString)
+
+
+  def save(transactions: Dataset[Transaction], path: URI): IO[Unit] =
+    IO(unsafeSave(transactions, path))
+
 
 }

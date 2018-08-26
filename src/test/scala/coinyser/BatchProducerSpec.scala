@@ -26,6 +26,7 @@ class BatchProducerSpec extends WordSpec with Matchers with BeforeAndAfterAll wi
   override implicit def patienceConfig: PatienceConfig = PatienceConfig(10.seconds, 100.millis)
 
 
+  // TODO use SharedSparkSession
   implicit val spark: SparkSession = SparkSession
     .builder
     .master("local[*]")
